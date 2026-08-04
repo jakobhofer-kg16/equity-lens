@@ -10,7 +10,12 @@
 
 import { DataError, type CompanyDossier } from '../types';
 import { mockProvider } from './providers/mock';
-import { createAlphaVantageProvider, SHORT_HISTORY_NOTE } from './providers/alphaVantage';
+import {
+  createAlphaVantageProvider,
+  fetchAlphaVantageDaily,
+  SHORT_HISTORY_NOTE
+} from './providers/alphaVantage';
+import { createFinnhubProvider, fetchAlphaVantagePriceTarget } from './providers/finnhub';
 import { fetchTwelveDataPrices } from './providers/twelveData';
 import { fetchNewsDataHeadlines } from './providers/newsData';
 import { getKeys } from './keys';
@@ -60,12 +65,14 @@ const inFlight = new Map<string, Promise<CompanyDossier>>();
 
 export function providerStatus() {
   const keys = getKeys();
+  const label = keys.finnhub ? 'Finnhub' : keys.alphaVantage ? 'Alpha Vantage' : 'Bundled sample data';
   return {
-    isMock: !keys.alphaVantage,
-    label: keys.alphaVantage ? 'Alpha Vantage' : 'Bundled sample data',
-    freshness: 'end-of-day' as const,
+    isMock: !keys.finnhub && !keys.alphaVantage,
+    label,
+    freshness: (keys.finnhub ? 'delayed' : 'end-of-day') as 'delayed' | 'end-of-day',
     sampleSymbols: SUPPORTED_MOCK_SYMBOLS,
     configured: {
+      finnhub: Boolean(keys.finnhub),
       alphaVantage: Boolean(keys.alphaVantage),
       twelveData: Boolean(keys.twelveData),
       newsData: Boolean(keys.newsData),
@@ -77,7 +84,7 @@ export function providerStatus() {
 /** Cache entries are per key set, so entering a key refreshes the view. */
 function signatureOf(): string {
   const keys = getKeys();
-  return [keys.alphaVantage, keys.twelveData, keys.newsData].map((k) => (k ? '1' : '0')).join('');
+  return [keys.finnhub, keys.alphaVantage, keys.twelveData, keys.newsData].map((k) => (k ? '1' : '0')).join('');
 }
 
 export function invalidateCache(): void {
@@ -137,9 +144,13 @@ async function assemble(symbol: string): Promise<CompanyDossier> {
     newsPending = true;
   }
 
-  const base = keys.alphaVantage
-    ? createAlphaVantageProvider(keys.alphaVantage, { skipPrices: Boolean(prices), skipNews: false })
-    : mockProvider;
+  // Finnhub first: 60 requests a minute against Alpha Vantage's 25 a day, and
+  // it carries the ratio history, the real peer set and the rating trend.
+  const base = keys.finnhub
+    ? createFinnhubProvider(keys.finnhub)
+    : keys.alphaVantage
+      ? createAlphaVantageProvider(keys.alphaVantage, { skipPrices: Boolean(prices), skipNews: false })
+      : mockProvider;
 
   let dossier: CompanyDossier;
   try {
@@ -165,6 +176,55 @@ async function assemble(symbol: string): Promise<CompanyDossier> {
       prices,
       benchmark: benchmark ? { ...benchmark, symbol: 'S&P 500 (SPY)' } : dossier.benchmark
     };
+  }
+
+  // Finnhub has no price history on the free plan, so if Twelve Data did not
+  // cover it, Alpha Vantage is the last resort before the chart goes empty.
+  if (keys.finnhub && !prices && keys.alphaVantage && !dossier.prices.bars.length) {
+    try {
+      const fallback = await fetchAlphaVantageDaily(symbol, keys.alphaVantage);
+      dossier = {
+        ...dossier,
+        prices: fallback.prices,
+        benchmark: fallback.benchmark ?? dossier.benchmark
+      };
+      notes.push(
+        `Price history from Alpha Vantage: ${fallback.bars} daily bars. Finnhub keeps prices behind a paid plan; a Twelve Data key gives several years instead.`
+      );
+    } catch (err) {
+      notes.push(`Price history unavailable: ${(err as Error).message}`);
+    }
+  }
+
+  if (keys.finnhub && !dossier.prices.bars.length) {
+    notes.push(
+      'No price history: Finnhub keeps it behind a paid plan. Add a Twelve Data key (free, multi-year) to fill the chart.'
+    );
+  }
+
+  // Finnhub keeps price targets behind a paid plan, but Alpha Vantage publishes
+  // one for free. Worth exactly one request out of the 25 daily budget.
+  if (keys.finnhub && keys.alphaVantage && !dossier.priceTargets) {
+    try {
+      const target = await fetchAlphaVantagePriceTarget(symbol, keys.alphaVantage);
+      if (target) {
+        dossier = {
+          ...dossier,
+          priceTargets: {
+            symbol,
+            average: target.average,
+            median: target.average,
+            high: null,
+            low: null,
+            analystCount: dossier.consensus?.analystCount ?? 0,
+            asOf: target.asOf
+          }
+        };
+        notes.push('Consensus price target from Alpha Vantage (one request).');
+      }
+    } catch {
+      notes.push('Alpha Vantage price target unavailable.');
+    }
   }
 
   if (newsPending) {

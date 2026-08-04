@@ -17,6 +17,7 @@ import {
   DataError,
   type AnalystConsensus,
   type FinancialPeriod,
+  type HistoricalPrices,
   type NewsItem,
   type NewsSentiment,
   type PriceBar,
@@ -243,6 +244,29 @@ function parseConsensus(overview: Json, symbol: string): AnalystConsensus | null
     trend: [],
     recentActions: []
   };
+}
+
+/**
+ * Prices only. Finnhub is the better base provider but keeps price history
+ * behind a paid plan, so when no Twelve Data key is configured this covers the
+ * chart for two requests out of the 25 daily budget.
+ */
+export async function fetchAlphaVantageDaily(
+  symbol: string,
+  apiKey: string
+): Promise<{ prices: HistoricalPrices; benchmark: HistoricalPrices | null; bars: number }> {
+  const daily = await call('TIME_SERIES_DAILY', { symbol, outputsize: DAILY_OUTPUT_SIZE }, apiKey);
+  const bars = parseDailySeries(daily, symbol);
+
+  let benchmark: HistoricalPrices | null = null;
+  try {
+    const raw = await call('TIME_SERIES_DAILY', { symbol: BENCHMARK_SYMBOL, outputsize: DAILY_OUTPUT_SIZE }, apiKey);
+    benchmark = { symbol: 'S&P 500 (SPY)', bars: parseDailySeries(raw, BENCHMARK_SYMBOL) };
+  } catch {
+    // The benchmark is optional; the comparison toggle simply stays unavailable.
+  }
+
+  return { prices: { symbol, bars }, benchmark, bars: bars.length };
 }
 
 export interface AlphaVantageOptions {

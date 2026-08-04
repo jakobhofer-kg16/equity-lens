@@ -45,16 +45,31 @@ npm run preview   # serve the production build
 
 ## Data providers
 
-**Alpha Vantage** is the live provider. It was chosen after testing the free
-tiers of several services, for three reasons:
+**Finnhub** is the primary provider, with **Twelve Data** for price history and
+**Alpha Vantage** for one thing neither of them gives away. All three send CORS
+headers, so a static build needs no proxy. Every tier below was verified against
+a real key, not read off a pricing page.
 
-1. A single `OVERVIEW` call returns the company profile, valuation multiples,
-   margins, returns, growth, the 52-week range **and** the full analyst rating
-   distribution plus target price. Free analyst consensus is rare.
-2. It sends `Access-Control-Allow-Origin: *`, so a static build can call it
-   directly with no proxy.
-3. The free key allows unlimited daily requests for verified educational
-   projects — the standard free limit is otherwise 25 requests/day.
+| | Finnhub free | Alpha Vantage free | Twelve Data free |
+|---|---|---|---|
+| Budget | **60 / minute** | 25 / **day** | 800 / day |
+| Profile, logo | ✓ | ✓ (no logo) | — |
+| Ratios | ✓ 133 metrics | ✓ | — |
+| Fundamentals history | ✓ 39 annual + 41 quarterly series | ✓ statements | — |
+| Peers | ✓ real list | — | — |
+| Analyst distribution | ✓ **month by month** | ✓ current snapshot only | — |
+| Consensus price target | premium | ✓ | — |
+| Upgrades / downgrades | premium | — | — |
+| Price history | premium | 100 bars (`full` is premium) | ✓ multi-year |
+
+The budget line is what decides it: 60 requests a minute against 25 a day is the
+difference between fetching metrics for every peer and rationing calls. Finnhub
+is therefore the base, Twelve Data fills the chart, and Alpha Vantage is used for
+exactly one request — the price target that Finnhub charges for.
+
+Finnhub publishes per-share figures and margins rather than absolute statement
+lines, so the fundamentals charts reconstruct revenue and profit from them and
+the share count. Derived, not reported, and labelled as such in the app.
 
 Free-tier limits worth knowing:
 

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { ChartNoAxesColumn } from 'lucide-react';
 import type { EarningsEvent, HistoricalPrices, PriceBar } from '../types';
 import { macd as computeMacd, rsi as computeRsi, sma } from '../lib/indicators';
 import { formatCompact, formatCurrency } from '../lib/format';
@@ -103,6 +104,7 @@ export function CandlestickChart({ prices, benchmark, earnings = [], currency = 
   const [compare, setCompare] = useState(false);
 
   const bars = prices.bars;
+  const hasBars = bars.length > 1;
 
   // Indicators are computed over the complete series, then sliced. Computing
   // them on the visible window would change the values as you zoom.
@@ -344,6 +346,25 @@ export function CandlestickChart({ prices, benchmark, earnings = [], currency = 
    * different label, so those presets are disabled and say why on hover.
    */
   const historyMonths = Math.round((bars.length / 21) * 10) / 10;
+
+  // An empty SVG shell with "undefined to undefined" on the brush is worse than
+  // saying plainly that there is nothing to draw.
+  if (!hasBars) {
+    return (
+      <div ref={wrapRef} className="w-full">
+        <div className="flex items-start gap-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-6">
+          <ChartNoAxesColumn className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+          <div>
+            <p className="text-sm font-medium text-slate-700">No price history loaded</p>
+            <p className="mt-0.5 text-sm text-slate-500">
+              The configured provider does not supply daily bars for {prices.symbol}. Finnhub keeps price history
+              behind a paid plan — add a Twelve Data key under <strong>API keys</strong> for several years of it, free.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div ref={wrapRef} className="w-full">

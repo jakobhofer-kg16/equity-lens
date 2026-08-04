@@ -11,6 +11,7 @@
 const STORAGE_KEY = 'equity-lens.api-keys.v1';
 
 export interface ApiKeys {
+  finnhub: string;
   alphaVantage: string;
   twelveData: string;
   newsData: string;
@@ -19,7 +20,7 @@ export interface ApiKeys {
 
 export type ApiKeyName = keyof ApiKeys;
 
-const EMPTY: ApiKeys = { alphaVantage: '', twelveData: '', newsData: '', openRouter: '' };
+const EMPTY: ApiKeys = { finnhub: '', alphaVantage: '', twelveData: '', newsData: '', openRouter: '' };
 
 export interface ProviderDescriptor {
   name: ApiKeyName;
@@ -33,13 +34,22 @@ export interface ProviderDescriptor {
 
 export const PROVIDERS: ProviderDescriptor[] = [
   {
+    name: 'finnhub',
+    label: 'Finnhub',
+    envName: 'FINNHUB_API_KEY',
+    signupUrl: 'https://finnhub.io/register',
+    powers:
+      'The main key. Profile and logo, 133 ratios with several years of history, a real peer set, and the analyst rating distribution month by month. 60 requests per minute on the free plan.',
+    required: true
+  },
+  {
     name: 'alphaVantage',
     label: 'Alpha Vantage',
     envName: 'ALPHAVANTAGE_API_KEY',
     signupUrl: 'https://www.alphavantage.co/support/#api-key',
     powers:
-      'Company profile, fundamentals, valuation multiples and the analyst consensus. The single most valuable key here — without it everything falls back to bundled sample data.',
-    required: true
+      'Adds the consensus price target, which Finnhub keeps behind a paid plan. Used for one request per company, because the free key allows only 25 per day.',
+    required: false
   },
   {
     name: 'twelveData',
@@ -70,6 +80,7 @@ export const PROVIDERS: ProviderDescriptor[] = [
 
 function fromEnv(): ApiKeys {
   return {
+    finnhub: (import.meta.env.VITE_FINNHUB_KEY as string) ?? '',
     alphaVantage: (import.meta.env.VITE_ALPHAVANTAGE_KEY as string) ?? '',
     twelveData: (import.meta.env.VITE_TWELVEDATA_KEY as string) ?? '',
     newsData: (import.meta.env.VITE_NEWSDATA_KEY as string) ?? '',
@@ -84,6 +95,7 @@ function read(): ApiKeys {
     const env = fromEnv();
     // A key typed into the panel wins over the build-time variable.
     return {
+      finnhub: stored.finnhub || env.finnhub,
       alphaVantage: stored.alphaVantage || env.alphaVantage,
       twelveData: stored.twelveData || env.twelveData,
       newsData: stored.newsData || env.newsData,
