@@ -16,7 +16,14 @@ import { fetchNewsDataHeadlines } from './providers/newsData';
 import { getKeys } from './keys';
 import { SUPPORTED_MOCK_SYMBOLS } from '../data/mockSeeds';
 
-const CACHE_TTL_MS = 10 * 60 * 1000;
+/**
+ * A free Alpha Vantage key allows 25 requests a day and one dossier costs
+ * several, so the cache is persisted. Without it a page refresh would silently
+ * spend another chunk of the daily budget on data already fetched.
+ */
+const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+const CACHE_STORAGE_KEY = 'equity-lens.dossier-cache.v1';
+const MAX_CACHED_SYMBOLS = 8;
 const BENCHMARK_SYMBOL = 'SPY';
 
 interface CacheEntry {
@@ -25,7 +32,29 @@ interface CacheEntry {
   value: CompanyDossier;
 }
 
-const cache = new Map<string, CacheEntry>();
+function readCache(): Map<string, CacheEntry> {
+  try {
+    const raw = localStorage.getItem(CACHE_STORAGE_KEY);
+    if (!raw) return new Map();
+    const entries = JSON.parse(raw) as Array<[string, CacheEntry]>;
+    return new Map(entries.filter(([, entry]) => Date.now() - entry.at < CACHE_TTL_MS));
+  } catch {
+    return new Map();
+  }
+}
+
+function persistCache(): void {
+  try {
+    // Newest first, so the trim keeps what was looked at most recently.
+    const entries = [...cache.entries()].sort((a, b) => b[1].at - a[1].at).slice(0, MAX_CACHED_SYMBOLS);
+    localStorage.setItem(CACHE_STORAGE_KEY, JSON.stringify(entries));
+  } catch {
+    // Quota exceeded or storage blocked: the in-memory cache still works for
+    // this page load, which is the case that matters most.
+  }
+}
+
+const cache = readCache();
 /** In-flight requests, so a double click cannot fire the same call twice. */
 const inFlight = new Map<string, Promise<CompanyDossier>>();
 
@@ -53,11 +82,64 @@ function signatureOf(): string {
 
 export function invalidateCache(): void {
   cache.clear();
+  try {
+    localStorage.removeItem(CACHE_STORAGE_KEY);
+  } catch {
+    /* nothing to clear */
+  }
+}
+
+/** Symbols that can be reopened without spending any request budget. */
+export function cachedSymbols(): string[] {
+  const signature = signatureOf();
+  return [...cache.entries()]
+    .filter(([, entry]) => entry.keySignature === signature && Date.now() - entry.at < CACHE_TTL_MS)
+    .sort((a, b) => b[1].at - a[1].at)
+    .map(([symbol]) => symbol);
 }
 
 async function assemble(symbol: string): Promise<CompanyDossier> {
   const keys = getKeys();
-  const base = keys.alphaVantage ? createAlphaVantageProvider(keys.alphaVantage) : mockProvider;
+  const notes: string[] = [];
+
+  // The optional providers run FIRST, because whether they succeed decides what
+  // the base provider still has to fetch. Deciding to skip an Alpha Vantage
+  // request before knowing that its replacement worked leaves the page with
+  // neither — the skip has to be earned, not assumed.
+  let prices: Awaited<ReturnType<typeof fetchTwelveDataPrices>> | null = null;
+  let benchmark: Awaited<ReturnType<typeof fetchTwelveDataPrices>> | null = null;
+
+  if (keys.twelveData) {
+    try {
+      const [main, bench] = await Promise.all([
+        fetchTwelveDataPrices(symbol, keys.twelveData),
+        // The benchmark must come from the same source, otherwise the indexed
+        // comparison runs a multi-year series against a much shorter one.
+        fetchTwelveDataPrices(BENCHMARK_SYMBOL, keys.twelveData).catch(() => null)
+      ]);
+      prices = main;
+      benchmark = bench;
+      const years = Math.round((main.bars.length / 252) * 10) / 10;
+      notes.push(
+        `Price history from Twelve Data: ${main.bars.length} daily bars (about ${years} years). The one-year return and the 200-day average are computed from this series.`
+      );
+      if (!bench) notes.push('Benchmark series unavailable from Twelve Data, falling back to the base provider.');
+    } catch (err) {
+      notes.push(`Twelve Data prices unavailable, falling back to the base provider: ${(err as Error).message}`);
+    }
+  }
+
+  let news: Awaited<ReturnType<typeof fetchNewsDataHeadlines>> | null = null;
+  let newsPending = false;
+  if (keys.newsData) {
+    // The company name is only known after the base provider answers, so the
+    // headline call is deferred; the base provider must still fetch its own.
+    newsPending = true;
+  }
+
+  const base = keys.alphaVantage
+    ? createAlphaVantageProvider(keys.alphaVantage, { skipPrices: Boolean(prices), skipNews: false })
+    : mockProvider;
 
   let dossier: CompanyDossier;
   try {
@@ -74,48 +156,30 @@ async function assemble(symbol: string): Promise<CompanyDossier> {
     }
   }
 
-  if (keys.twelveData) {
-    try {
-      // The benchmark comes from the same source as the stock, otherwise the
-      // indexed comparison would run one long series against one short one.
-      const [prices, benchmark] = await Promise.all([
-        fetchTwelveDataPrices(symbol, keys.twelveData),
-        fetchTwelveDataPrices(BENCHMARK_SYMBOL, keys.twelveData).catch(() => null)
-      ]);
-
-      dossier = {
-        ...dossier,
-        prices,
-        benchmark: benchmark ? { ...benchmark, symbol: 'S&P 500 (SPY)' } : dossier.benchmark
-      };
-
-      // The base provider's short-history warning no longer applies.
-      dossier.source.notes = dossier.source.notes.filter((note) => !note.startsWith(SHORT_HISTORY_NOTE));
-
-      const years = Math.round((prices.bars.length / 252) * 10) / 10;
-      dossier.source.notes.push(
-        `Price history from Twelve Data: ${prices.bars.length} daily bars (about ${years} years). The one-year return and the 200-day average are computed from this series.`
-      );
-      if (!benchmark) {
-        dossier.source.notes.push('Benchmark series unavailable from Twelve Data, keeping the base provider\'s.');
-      }
-    } catch (err) {
-      dossier.source.notes.push(`Twelve Data prices unavailable: ${(err as Error).message}`);
-    }
+  if (prices) {
+    // A longer series supersedes the base provider's short-history warning;
+    // two contradictory notes are worse than none.
+    dossier.source.notes = dossier.source.notes.filter((note) => !note.startsWith(SHORT_HISTORY_NOTE));
+    dossier = {
+      ...dossier,
+      prices,
+      benchmark: benchmark ? { ...benchmark, symbol: 'S&P 500 (SPY)' } : dossier.benchmark
+    };
   }
 
-  if (keys.newsData) {
+  if (newsPending) {
     try {
-      const news = await fetchNewsDataHeadlines(symbol, dossier.profile.name, keys.newsData);
+      news = await fetchNewsDataHeadlines(symbol, dossier.profile.name, keys.newsData);
       dossier = { ...dossier, news };
-      dossier.source.notes.push('Headlines from newsdata.io.');
+      notes.push('Headlines from newsdata.io.');
     } catch (err) {
-      dossier.source.notes.push(`newsdata.io headlines unavailable: ${(err as Error).message}`);
+      notes.push(`newsdata.io headlines unavailable, keeping the base provider's: ${(err as Error).message}`);
     }
   }
 
-  // Strip the marker from any warning that survived.
-  dossier.source.notes = dossier.source.notes.map((note) => note.replace(SHORT_HISTORY_NOTE, ''));
+  dossier.source.notes = [...dossier.source.notes, ...notes].map((note) =>
+    note.replace(SHORT_HISTORY_NOTE, '')
+  );
   return dossier;
 }
 
@@ -139,5 +203,6 @@ export async function loadDossier(rawSymbol: string, options: { force?: boolean 
 
   const value = await request;
   cache.set(symbol, { at: Date.now(), keySignature: signature, value });
+  persistCache();
   return value;
 }

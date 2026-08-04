@@ -38,6 +38,7 @@ npm run preview   # serve the production build
 | Industry comparison | 1-year performance against the industry, plus the top 3 alternatives ranked on fundamentals |
 | Analyst consensus | What the sell side publishes, kept strictly separate from our model |
 | News and catalysts | Sourced headlines, model-scored sentiment, upcoming events |
+| Earnings call sentiment | Tone of the last four calls, management against analysts, from real transcripts |
 | Fun facts | Trivia and arithmetic curiosities. Entertainment, clearly labelled |
 | Investment thesis builder | An editable bull/base/bear draft you can copy out |
 | Watchlist | Browser-local, no account needed |
@@ -67,8 +68,18 @@ Free-tier limits worth knowing:
   series and the benchmark, and the one-year return and 200-day average are then
   computed from that longer series. The superseded warning is retracted rather
   than left contradicting the newer note.
-- One dossier costs up to eight requests, so responses are cached for 10 minutes
-  and identical in-flight requests are de-duplicated.
+- The free key also refuses **bursts**: no more than one request per second.
+  Every call goes through a queue that serialises and spaces them, because
+  firing a dossier's requests in parallel trips the limiter well before the
+  daily quota does.
+- A dossier costs up to eight requests against a budget of 25, so: responses are
+  cached for six hours **and persisted across reloads** (a refresh would
+  otherwise silently re-spend the budget), identical in-flight requests are
+  de-duplicated, and any call another configured key already covers is not made
+  at all. A Twelve Data key removes two requests, a newsdata.io key one.
+- Optional providers are fetched **before** the base provider, so skipping an
+  Alpha Vantage request is only decided once its replacement has actually
+  succeeded. Deciding to skip up front would leave the page with neither.
 
 ### Entering keys
 
@@ -92,12 +103,24 @@ For local development the same keys can be set as `VITE_`-prefixed variables in
 `.env.local`; see `.env.example`. Note that those are compiled into the bundle
 and are therefore public, so the panel is the better route.
 
+### Earnings call transcripts
+
+Every commercial transcript API is premium, Finnhub's included. This section
+therefore runs on the archive published for the course:
+
+<https://github.com/kwartler/vienna-genai-finance-course/tree/main/earnings_call_archive/transcripts_sp500_marketbeat>
+
+2,899 transcripts across 383 S&P 500 companies, served from
+raw.githubusercontent.com with `Access-Control-Allow-Origin: *`. No key, no
+proxy. The four most recent quarters per ticker are indexed in
+`src/data/earningsArchive.ts`.
+
 ### Providers evaluated and rejected
 
 | Provider | Why not |
 |---|---|
 | Financial Modeling Prep | Analyst estimates, grades and peers sit behind paid tiers; the free plan is 250 requests/day |
-| Finnhub | Recommendation trends are free, but detailed financials are premium |
+| Finnhub | `/stock/candle`, price targets, upgrades/downgrades and news sentiment are all premium. `/stock/peers` and `/stock/recommendation` are free and would be worth adding — see next improvements |
 | SEC EDGAR (`data.sec.gov`) | Free, official, complete history, no key — but sends no CORS header, so a static page cannot call it, and it carries no analyst data. Worth adding behind the proxy later |
 | Stooq | Now behind a JavaScript bot challenge, unusable from a browser app |
 
@@ -162,6 +185,31 @@ Classification: **Bullish** at 65+, **Watch** from 40 to 64, **Bearish** below
 
 Every band is shown in the UI under "Show how this score is built". They are
 chosen for teaching, not calibrated against realised returns.
+
+## Earnings call sentiment
+
+Scored with a finance-specific word list rather than a general one. This is the
+Loughran-McDonald observation: ordinary sentiment lexicons treat "liability",
+"cost", "capital" and "depreciation" as negative, so scoring an earnings call
+with one mostly measures how much accounting was discussed.
+
+Three dimensions are tracked: polarity, **hedging** (a confident quarter and a
+hedged one can have identical positive/negative counts) and **legal vocabulary**
+(which tends to rise before trouble becomes a headline).
+
+Management and analysts are scored separately, because management normally
+scores higher on any call — they are presenting, the analysts are probing. The
+signal is the gap and how it moves quarter to quarter, not either number alone.
+Speakers are separated by employer, not job title, for the reason described in
+`earningsCalls.ts`.
+
+Boilerplate is excluded: every call opens with the same welcome and safe-harbour
+language, and left in it wins "most positive passage" on almost every
+transcript. A highlighted passage also has to contain several tone words, so a
+single word cannot drive a passage to ±1.0.
+
+This is a word-count model. It cannot read sarcasm, negation or context, and the
+UI says so.
 
 ### Where the analyst data comes from
 
@@ -246,6 +294,12 @@ sample data.
    most likely to break silently when a provider changes a field name.
 6. Replace the static sector medians with a computed median over the peer set
    once peer metrics are live.
+7. Add Finnhub for the two things its free tier does well and Alpha Vantage
+   cannot: `/stock/peers` would replace the curated peer list with a real one,
+   and `/stock/recommendation` returns the analyst rating distribution **over
+   time**, which would fill the recommendation-trend panel that currently
+   reports itself as unavailable. Both send CORS headers. Its transcripts,
+   candles, price targets and sentiment endpoints are premium.
 
 ## Compliance and transparency
 

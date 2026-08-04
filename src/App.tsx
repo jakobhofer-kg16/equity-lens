@@ -14,6 +14,7 @@ import { PeerComparison } from './components/PeerComparison';
 import { IndustryComparison } from './components/IndustryComparison';
 import { AnalystConsensus } from './components/AnalystConsensus';
 import { NewsCatalysts } from './components/NewsCatalysts';
+import { EarningsSentiment } from './components/EarningsSentiment';
 import { FunFacts } from './components/FunFacts';
 import { ThesisBuilder } from './components/ThesisBuilder';
 import { WatchlistPanel } from './components/Watchlist';
@@ -177,6 +178,7 @@ export default function App() {
             <IndustryComparison dossier={dossier} />
             <AnalystConsensus dossier={dossier} score={score} />
             <NewsCatalysts dossier={dossier} />
+            <EarningsSentiment symbol={dossier.profile.symbol} />
             <FunFacts dossier={dossier} />
             <ThesisBuilder dossier={dossier} score={score} />
           </>

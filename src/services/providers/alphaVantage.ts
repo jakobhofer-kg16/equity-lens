@@ -48,6 +48,24 @@ export const SHORT_HISTORY_NOTE = '\u0000short-history\u0000';
 
 type Json = Record<string, unknown>;
 
+/**
+ * The free key rejects bursts: it wants no more than one request per second.
+ * Every call goes through this queue, which serialises them and spaces them out.
+ * Firing a dossier's calls in parallel is what trips the limiter, not the daily
+ * quota.
+ */
+const MIN_REQUEST_GAP_MS = 1100;
+let requestChain: Promise<unknown> = Promise.resolve();
+
+function throttle<T>(task: () => Promise<T>): Promise<T> {
+  const result = requestChain.then(task, task);
+  requestChain = result.then(
+    () => new Promise((resolve) => setTimeout(resolve, MIN_REQUEST_GAP_MS)),
+    () => new Promise((resolve) => setTimeout(resolve, MIN_REQUEST_GAP_MS))
+  );
+  return result;
+}
+
 function num(value: unknown): number | null {
   if (value === null || value === undefined) return null;
   const text = String(value).trim();
@@ -64,6 +82,10 @@ function positive(value: unknown): number | null {
 }
 
 async function call(fn: string, params: Record<string, string>, apiKey: string): Promise<Json> {
+  return throttle(() => callNow(fn, params, apiKey));
+}
+
+async function callNow(fn: string, params: Record<string, string>, apiKey: string): Promise<Json> {
   const query = new URLSearchParams({ function: fn, apikey: apiKey, ...params });
 
   let response: Response;
@@ -83,8 +105,15 @@ async function call(fn: string, params: Record<string, string>, apiKey: string):
   // message field, so status codes alone are not enough.
   const note = (json.Note ?? json.Information ?? json['Error Message']) as string | undefined;
   if (note) {
-    if (/rate limit|per day|frequency/i.test(note)) {
-      throw new DataError('rate-limited', note, 60);
+    if (/rate limit|per day|per second|frequency|sparingly/i.test(note)) {
+      const daily = /per day|25 requests/i.test(note);
+      throw new DataError(
+        'rate-limited',
+        daily
+          ? `Alpha Vantage daily limit reached (25 requests on a free key). Cached companies still open instantly; new ones need a fresh key, a Twelve Data key to cover prices, or tomorrow. Original message: ${note.replace(/\s+/g, ' ').trim()}`
+          : `Alpha Vantage is throttling: ${note.replace(/\s+/g, ' ').trim()}`,
+        daily ? null : 5
+      );
     }
     if (/premium/i.test(note)) {
       throw new DataError(
@@ -216,7 +245,14 @@ function parseConsensus(overview: Json, symbol: string): AnalystConsensus | null
   };
 }
 
-export function createAlphaVantageProvider(apiKey: string): StockDataProvider {
+export interface AlphaVantageOptions {
+  /** Twelve Data is configured, so its price series will replace ours anyway. */
+  skipPrices?: boolean;
+  /** newsdata.io is configured and will replace the headlines. */
+  skipNews?: boolean;
+}
+
+export function createAlphaVantageProvider(apiKey: string, options: AlphaVantageOptions = {}): StockDataProvider {
   return {
     id: 'alpha-vantage',
     label: 'Alpha Vantage',
@@ -227,35 +263,46 @@ export function createAlphaVantageProvider(apiKey: string): StockDataProvider {
     async getDossier(rawSymbol) {
       const symbol = rawSymbol.toUpperCase();
 
-      const [overview, daily] = await Promise.all([
-        call('OVERVIEW', { symbol }, apiKey),
-        call('TIME_SERIES_DAILY', { symbol, outputsize: DAILY_OUTPUT_SIZE }, apiKey)
-      ]);
-
+      // Every request counts against 25 per day, so anything another configured
+      // provider already covers is not fetched at all.
+      const overview = await call('OVERVIEW', { symbol }, apiKey);
       if (!overview.Symbol) {
         throw new DataError('unsupported-ticker', `Alpha Vantage does not cover "${symbol}".`);
       }
 
+      const daily = options.skipPrices
+        ? null
+        : await call('TIME_SERIES_DAILY', { symbol, outputsize: DAILY_OUTPUT_SIZE }, apiKey);
+
       // Everything below is best-effort: a missing statement should degrade one
       // section, not fail the whole page.
-      const [income, balance, cash, earnings, news, benchmark] = await Promise.allSettled([
-        call('INCOME_STATEMENT', { symbol }, apiKey),
-        call('BALANCE_SHEET', { symbol }, apiKey),
-        call('CASH_FLOW', { symbol }, apiKey),
-        call('EARNINGS', { symbol }, apiKey),
-        call('NEWS_SENTIMENT', { tickers: symbol, limit: '20' }, apiKey),
-        call('TIME_SERIES_DAILY', { symbol: BENCHMARK_SYMBOL, outputsize: DAILY_OUTPUT_SIZE }, apiKey)
-      ]);
-      const settled = (r: PromiseSettledResult<Json>) => (r.status === 'fulfilled' ? r.value : null);
+      const optional = async (enabled: boolean, task: () => Promise<Json>) =>
+        enabled ? task().then((v) => v).catch(() => null) : null;
 
-      const bars = parseDailySeries(daily, symbol);
+      // Sequential, because the throttle serialises them regardless and this
+      // keeps the order of what gets spent first predictable.
+      const income = await optional(true, () => call('INCOME_STATEMENT', { symbol }, apiKey));
+      const balance = await optional(true, () => call('BALANCE_SHEET', { symbol }, apiKey));
+      const cash = await optional(true, () => call('CASH_FLOW', { symbol }, apiKey));
+      const earnings = await optional(true, () => call('EARNINGS', { symbol }, apiKey));
+      const news = await optional(!options.skipNews, () =>
+        call('NEWS_SENTIMENT', { tickers: symbol, limit: '20' }, apiKey)
+      );
+      const benchmark = await optional(!options.skipPrices, () =>
+        call('TIME_SERIES_DAILY', { symbol: BENCHMARK_SYMBOL, outputsize: DAILY_OUTPUT_SIZE }, apiKey)
+      );
+
+      const bars = daily ? parseDailySeries(daily, symbol) : [];
       const notes: string[] = [];
-      if (bars.length <= ALPHA_VANTAGE_DAILY_BARS) {
+      if (options.skipPrices) {
+        notes.push('Alpha Vantage price requests skipped — Twelve Data is configured and covers the series.');
+      }
+      if (bars.length && bars.length <= ALPHA_VANTAGE_DAILY_BARS) {
         notes.push(
           `${SHORT_HISTORY_NOTE}Alpha Vantage's free tier returns ${bars.length} daily bars (about ${Math.round((bars.length / 21) * 10) / 10} months). The 200-day average and the one-year return need more history — add a Twelve Data key to load several years.`
         );
       }
-      const annual = parseStatements(settled(income), settled(balance), settled(cash));
+      const annual = parseStatements(income, balance, cash);
       const price = bars[bars.length - 1]?.close ?? 0;
       const previousClose = bars[bars.length - 2]?.close ?? price;
 
@@ -270,8 +317,8 @@ export function createAlphaVantageProvider(apiKey: string): StockDataProvider {
       const sector = overview.Sector ? String(overview.Sector) : null;
       const peerSymbols = PEER_MAP[symbol] ?? [];
 
-      const earningsRows = ((settled(earnings)?.quarterlyEarnings as Json[] | undefined) ?? []).slice(0, 8);
-      const benchmarkBars = settled(benchmark) ? parseDailySeries(settled(benchmark) as Json, BENCHMARK_SYMBOL) : [];
+      const earningsRows = ((earnings?.quarterlyEarnings as Json[] | undefined) ?? []).slice(0, 8);
+      const benchmarkBars = benchmark ? parseDailySeries(benchmark, BENCHMARK_SYMBOL) : [];
 
       return {
         source: {
@@ -387,7 +434,7 @@ export function createAlphaVantageProvider(apiKey: string): StockDataProvider {
             }
           : null,
         estimates: null,
-        news: parseNews(settled(news), symbol),
+        news: parseNews(news, symbol),
         catalysts: [],
         earnings: {
           symbol,
