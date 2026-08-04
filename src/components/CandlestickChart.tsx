@@ -29,6 +29,9 @@ const AXIS_TEXT = '#64748b';
 
 export type RangeKey = '1M' | '3M' | '6M' | '1Y' | '5Y' | 'YTD' | 'ALL';
 
+/** Narrowest window the brush may be dragged to. */
+const MIN_BRUSH_BARS = 8;
+
 const RANGE_DAYS: Record<Exclude<RangeKey, 'YTD' | 'ALL'>, number> = {
   '1M': 22,
   '3M': 66,
@@ -51,6 +54,23 @@ function useWidth<T extends HTMLElement>() {
   }, []);
 
   return [ref, width] as const;
+}
+
+/**
+ * Maps a client x-coordinate into the SVG's own coordinate system.
+ *
+ * getBoundingClientRect is not enough: the viewBox is clamped to a minimum
+ * width, so on a narrow container the SVG is scaled and one CSS pixel is not
+ * one viewBox unit. Going through the screen CTM is correct at any scale, and
+ * also survives browser zoom.
+ */
+function svgX(svg: SVGSVGElement, clientX: number): number | null {
+  const ctm = svg.getScreenCTM();
+  if (!ctm) return null;
+  const point = svg.createSVGPoint();
+  point.x = clientX;
+  point.y = 0;
+  return point.matrixTransform(ctm.inverse()).x;
 }
 
 function niceTicks(min: number, max: number, count: number): number[] {
@@ -76,6 +96,9 @@ export function CandlestickChart({ prices, benchmark, earnings = [], currency = 
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
   const [hover, setHover] = useState<number | null>(null);
+  /** Explicit window set by dragging the brush. Overrides the presets. */
+  const [brush, setBrush] = useState<{ start: number; end: number } | null>(null);
+  const dragRef = useRef<{ mode: 'pan' | 'left' | 'right'; from: number; start: number; end: number } | null>(null);
   const [showMa, setShowMa] = useState(true);
   const [compare, setCompare] = useState(false);
 
@@ -95,6 +118,7 @@ export function CandlestickChart({ prices, benchmark, earnings = [], currency = 
 
   const [startIndex, endIndex] = useMemo(() => {
     if (!bars.length) return [0, 0];
+    if (brush) return [brush.start, brush.end];
 
     if (customFrom || customTo) {
       const from = customFrom || bars[0].date;
@@ -116,7 +140,7 @@ export function CandlestickChart({ prices, benchmark, earnings = [], currency = 
       return [s < 0 ? 0 : s, end];
     }
     return [Math.max(0, end - RANGE_DAYS[range] + 1), end];
-  }, [bars, range, customFrom, customTo]);
+  }, [bars, range, customFrom, customTo, brush]);
 
   const visible = bars.slice(startIndex, endIndex + 1);
   const innerWidth = Math.max(width - PAD_LEFT - PAD_RIGHT, 120);
@@ -226,11 +250,66 @@ export function CandlestickChart({ prices, benchmark, earnings = [], currency = 
   const hoveredBar: PriceBar | null = hover !== null ? (visible[hover] ?? null) : null;
   const hoveredGlobal = hover !== null ? startIndex + hover : null;
 
+  const lastIndex = Math.max(bars.length - 1, 1);
+  const brushX = (i: number) => PAD_LEFT + (i / lastIndex) * innerWidth;
+  const brushIndexAt = (svg: SVGSVGElement, clientX: number): number | null => {
+    const x = svgX(svg, clientX);
+    return x === null ? null : Math.round(((x - PAD_LEFT) / innerWidth) * lastIndex);
+  };
+
+  function beginDrag(mode: 'pan' | 'left' | 'right', event: React.PointerEvent<SVGElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    const svg = event.currentTarget.ownerSVGElement;
+    if (!svg) return;
+    const from = brushIndexAt(svg, event.clientX);
+    if (from === null) return;
+    dragRef.current = { mode, from, start: startIndex, end: endIndex };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  }
+
   function handlePointer(event: React.PointerEvent<SVGSVGElement>) {
-    const rect = event.currentTarget.getBoundingClientRect();
-    const x = event.clientX - rect.left - PAD_LEFT;
-    const index = Math.floor(x / step);
+    const svg = event.currentTarget;
+    const drag = dragRef.current;
+
+    // While dragging the brush the pointer is steering the window, not the
+    // crosshair, so the hover readout stands down until the drag ends.
+    if (drag) {
+      const index = brushIndexAt(svg, event.clientX);
+      if (index === null) return;
+      const delta = index - drag.from;
+      const width = drag.end - drag.start;
+
+      if (drag.mode === 'pan') {
+        const start = Math.max(0, Math.min(lastIndex - width, drag.start + delta));
+        setBrush({ start, end: start + width });
+      } else if (drag.mode === 'left') {
+        setBrush({ start: Math.max(0, Math.min(index, drag.end - MIN_BRUSH_BARS)), end: drag.end });
+      } else {
+        setBrush({ start: drag.start, end: Math.min(lastIndex, Math.max(index, drag.start + MIN_BRUSH_BARS)) });
+      }
+      setHover(null);
+      return;
+    }
+
+    const x = svgX(svg, event.clientX);
+    if (x === null) return;
+    const index = Math.floor((x - PAD_LEFT) / step);
     setHover(index >= 0 && index < visible.length ? index : null);
+  }
+
+  function nudgeBrush(direction: -1 | 1, resize: boolean) {
+    const width = endIndex - startIndex;
+    const amount = Math.max(1, Math.round(width * 0.1));
+    if (resize) {
+      setBrush({
+        start: startIndex,
+        end: Math.min(lastIndex, Math.max(startIndex + MIN_BRUSH_BARS, endIndex + direction * amount))
+      });
+      return;
+    }
+    const start = Math.max(0, Math.min(lastIndex - width, startIndex + direction * amount));
+    setBrush({ start, end: start + width });
   }
 
   const priceTicks = niceTicks(priceScale.min, priceScale.max, 5);
@@ -256,7 +335,7 @@ export function CandlestickChart({ prices, benchmark, earnings = [], currency = 
   const effectiveRange: RangeKey = rangeUnavailable(range) ? 'ALL' : range;
 
   const activeRangeButton = (key: RangeKey) =>
-    !customFrom && !customTo && effectiveRange === key
+    !brush && !customFrom && !customTo && effectiveRange === key
       ? 'bg-slate-900 text-white'
       : 'bg-white text-slate-600 hover:bg-slate-100';
 
@@ -275,7 +354,7 @@ export function CandlestickChart({ prices, benchmark, earnings = [], currency = 
             <button
               key={key}
               type="button"
-              aria-pressed={!customFrom && !customTo && effectiveRange === key}
+              aria-pressed={!brush && !customFrom && !customTo && effectiveRange === key}
               disabled={rangeUnavailable(key)}
               title={
                 rangeUnavailable(key)
@@ -286,6 +365,7 @@ export function CandlestickChart({ prices, benchmark, earnings = [], currency = 
                 setRange(key);
                 setCustomFrom('');
                 setCustomTo('');
+                setBrush(null);
               }}
               className={`px-2.5 py-1 text-xs font-semibold transition disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-300 ${activeRangeButton(key)}`}
             >
@@ -304,7 +384,10 @@ export function CandlestickChart({ prices, benchmark, earnings = [], currency = 
             value={customFrom}
             min={bars[0]?.date}
             max={bars[bars.length - 1]?.date}
-            onChange={(e) => setCustomFrom(e.target.value)}
+            onChange={(e) => {
+              setCustomFrom(e.target.value);
+              setBrush(null);
+            }}
             className="rounded-md border border-slate-300 px-1.5 py-1"
           />
           <label htmlFor="chart-to" className="font-medium">
@@ -316,7 +399,10 @@ export function CandlestickChart({ prices, benchmark, earnings = [], currency = 
             value={customTo}
             min={bars[0]?.date}
             max={bars[bars.length - 1]?.date}
-            onChange={(e) => setCustomTo(e.target.value)}
+            onChange={(e) => {
+              setCustomTo(e.target.value);
+              setBrush(null);
+            }}
             className="rounded-md border border-slate-300 px-1.5 py-1"
           />
           {(customFrom || customTo) && (
@@ -325,6 +411,7 @@ export function CandlestickChart({ prices, benchmark, earnings = [], currency = 
               onClick={() => {
                 setCustomFrom('');
                 setCustomTo('');
+                setBrush(null);
               }}
               className="rounded-md border border-slate-300 px-1.5 py-1 font-medium hover:bg-slate-100"
             >
@@ -381,6 +468,12 @@ export function CandlestickChart({ prices, benchmark, earnings = [], currency = 
         viewBox={`0 0 ${Math.max(width, 320)} ${TOTAL_HEIGHT}`}
         onPointerMove={handlePointer}
         onPointerLeave={() => setHover(null)}
+        onPointerUp={() => {
+          dragRef.current = null;
+        }}
+        onPointerCancel={() => {
+          dragRef.current = null;
+        }}
         className="touch-pan-y select-none"
       >
         {/* Price grid */}
@@ -588,7 +681,7 @@ export function CandlestickChart({ prices, benchmark, earnings = [], currency = 
           />
         ) : null}
 
-        {/* Brush: the whole series with the visible window highlighted */}
+        {/* Brush: drag the window to pan, drag an edge to resize */}
         <g transform={`translate(0, ${brushTop})`}>
           <rect x={PAD_LEFT} y={0} width={innerWidth} height={BRUSH_HEIGHT - 8} fill="#f1f5f9" rx={4} />
           {(() => {
@@ -596,21 +689,51 @@ export function CandlestickChart({ prices, benchmark, earnings = [], currency = 
             const min = Math.min(...closes);
             const max = Math.max(...closes);
             const h = BRUSH_HEIGHT - 12;
-            const d = bars
+            const outline = bars
               .map((bar, i) => {
-                const x = PAD_LEFT + (i / Math.max(bars.length - 1, 1)) * innerWidth;
                 const y = 2 + h - ((bar.close - min) / (max - min || 1)) * h;
-                return `${i === 0 ? 'M' : 'L'}${x},${y}`;
+                return `${i === 0 ? 'M' : 'L'}${brushX(i)},${y}`;
               })
               .join(' ');
-            const x1 = PAD_LEFT + (startIndex / Math.max(bars.length - 1, 1)) * innerWidth;
-            const x2 = PAD_LEFT + (endIndex / Math.max(bars.length - 1, 1)) * innerWidth;
+            const x1 = brushX(startIndex);
+            const x2 = brushX(endIndex);
+
             return (
               <>
-                <path d={d} fill="none" stroke="#94a3b8" strokeWidth={1} />
-                <rect x={x1} y={0} width={Math.max(2, x2 - x1)} height={BRUSH_HEIGHT - 8} fill="#2563eb" opacity={0.14} />
-                <line x1={x1} x2={x1} y1={0} y2={BRUSH_HEIGHT - 8} stroke="#2563eb" strokeWidth={1.5} />
-                <line x1={x2} x2={x2} y1={0} y2={BRUSH_HEIGHT - 8} stroke="#2563eb" strokeWidth={1.5} />
+                <path d={outline} fill="none" stroke="#94a3b8" strokeWidth={1} pointerEvents="none" />
+
+                {/* Window: drag to pan. Focusable so it is reachable without a pointer. */}
+                <rect
+                  x={x1}
+                  y={0}
+                  width={Math.max(2, x2 - x1)}
+                  height={BRUSH_HEIGHT - 8}
+                  fill="#2563eb"
+                  opacity={0.16}
+                  style={{ cursor: 'grab' }}
+                  tabIndex={0}
+                  role="slider"
+                  aria-label="Visible date window. Arrow keys pan, shift and arrow keys resize."
+                  aria-valuemin={0}
+                  aria-valuemax={lastIndex}
+                  aria-valuenow={startIndex}
+                  aria-valuetext={`${bars[startIndex]?.date} to ${bars[endIndex]?.date}`}
+                  onPointerDown={(e) => beginDrag('pan', e)}
+                  onKeyDown={(e) => {
+                    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+                    e.preventDefault();
+                    nudgeBrush(e.key === 'ArrowLeft' ? -1 : 1, e.shiftKey);
+                  }}
+                />
+
+                {/* Edge handles. The wide transparent rect is the grab target. */}
+                {([['left', x1], ['right', x2]] as const).map(([side, x]) => (
+                  <g key={side} style={{ cursor: 'ew-resize' }} onPointerDown={(e) => beginDrag(side, e)}>
+                    <rect x={x - 6} y={0} width={12} height={BRUSH_HEIGHT - 8} fill="transparent" />
+                    <line x1={x} x2={x} y1={0} y2={BRUSH_HEIGHT - 8} stroke="#2563eb" strokeWidth={2} />
+                    <rect x={x - 2.5} y={(BRUSH_HEIGHT - 8) / 2 - 5} width={5} height={10} rx={1.5} fill="#2563eb" />
+                  </g>
+                ))}
               </>
             );
           })()}
@@ -632,6 +755,9 @@ export function CandlestickChart({ prices, benchmark, earnings = [], currency = 
           </>
         )}
         {earningsMarkers.length ? <span>E = earnings date</span> : null}
+        <span className="text-slate-400">
+          Drag the blue window below the axis to pan, drag its edges to zoom.
+        </span>
       </div>
     </div>
   );

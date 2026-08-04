@@ -10,13 +10,14 @@
 
 import { DataError, type CompanyDossier } from '../types';
 import { mockProvider } from './providers/mock';
-import { createAlphaVantageProvider } from './providers/alphaVantage';
+import { createAlphaVantageProvider, SHORT_HISTORY_NOTE } from './providers/alphaVantage';
 import { fetchTwelveDataPrices } from './providers/twelveData';
 import { fetchNewsDataHeadlines } from './providers/newsData';
 import { getKeys } from './keys';
 import { SUPPORTED_MOCK_SYMBOLS } from '../data/mockSeeds';
 
 const CACHE_TTL_MS = 10 * 60 * 1000;
+const BENCHMARK_SYMBOL = 'SPY';
 
 interface CacheEntry {
   at: number;
@@ -75,8 +76,29 @@ async function assemble(symbol: string): Promise<CompanyDossier> {
 
   if (keys.twelveData) {
     try {
-      dossier = { ...dossier, prices: await fetchTwelveDataPrices(symbol, keys.twelveData) };
-      dossier.source.notes.push('Price history from Twelve Data.');
+      // The benchmark comes from the same source as the stock, otherwise the
+      // indexed comparison would run one long series against one short one.
+      const [prices, benchmark] = await Promise.all([
+        fetchTwelveDataPrices(symbol, keys.twelveData),
+        fetchTwelveDataPrices(BENCHMARK_SYMBOL, keys.twelveData).catch(() => null)
+      ]);
+
+      dossier = {
+        ...dossier,
+        prices,
+        benchmark: benchmark ? { ...benchmark, symbol: 'S&P 500 (SPY)' } : dossier.benchmark
+      };
+
+      // The base provider's short-history warning no longer applies.
+      dossier.source.notes = dossier.source.notes.filter((note) => !note.startsWith(SHORT_HISTORY_NOTE));
+
+      const years = Math.round((prices.bars.length / 252) * 10) / 10;
+      dossier.source.notes.push(
+        `Price history from Twelve Data: ${prices.bars.length} daily bars (about ${years} years). The one-year return and the 200-day average are computed from this series.`
+      );
+      if (!benchmark) {
+        dossier.source.notes.push('Benchmark series unavailable from Twelve Data, keeping the base provider\'s.');
+      }
     } catch (err) {
       dossier.source.notes.push(`Twelve Data prices unavailable: ${(err as Error).message}`);
     }
@@ -92,6 +114,8 @@ async function assemble(symbol: string): Promise<CompanyDossier> {
     }
   }
 
+  // Strip the marker from any warning that survived.
+  dossier.source.notes = dossier.source.notes.map((note) => note.replace(SHORT_HISTORY_NOTE, ''));
   return dossier;
 }
 

@@ -31,7 +31,7 @@ npm run preview   # serve the production build
 |---|---|
 | Company snapshot | What does this company do, and what is the stock doing today |
 | Executive verdict | Our own 0–100 score, expandable down to individual metrics |
-| Price performance | Candles, volume, MACD and RSI with range controls and a benchmark overlay |
+| Price performance | Candles, volume, MACD and RSI with range controls, a draggable brush and a benchmark overlay |
 | Business fundamentals | Is the business improving — trends, not a single latest number |
 | Valuation | Multiples against the sector median, with "not meaningful" where it applies |
 | Competitor comparison | How it stacks against a curated peer set |
@@ -63,8 +63,10 @@ Free-tier limits worth knowing:
   gets `compact` — the most recent 100 sessions, roughly five months. That is
   not enough for a 200-day average or a one-year return, so both report as
   unavailable rather than being computed over a shorter window and mislabelled.
-  **Add a Twelve Data key for multi-year history**; it takes over the price
-  series when present.
+  **Add a Twelve Data key for multi-year history**; it takes over both the price
+  series and the benchmark, and the one-year return and 200-day average are then
+  computed from that longer series. The superseded warning is retracted rather
+  than left contradicting the newer note.
 - One dossier costs up to eight requests, so responses are cached for 10 minutes
   and identical in-flight requests are de-duplicated.
 
@@ -123,6 +125,20 @@ The function holds the real key as a server environment variable, so it never
 reaches the browser. Restrict it to an allowlist of `function` values so it
 cannot be used as an open proxy.
 
+### The price chart
+
+Presets (1M–ALL), explicit from/to dates, and a brush under the axis that can be
+dragged to pan and grabbed by either edge to zoom. All four panels share one
+x-scale, so they redraw together. The brush is focusable: arrow keys pan, shift
+and arrow keys resize.
+
+Pointer positions are mapped through the SVG's screen matrix rather than
+`getBoundingClientRect`, because the viewBox is clamped to a minimum width — on
+a narrow container the SVG is scaled and one CSS pixel is not one viewBox unit.
+
+Indicators are computed over the full series and then sliced, so values do not
+change as you zoom.
+
 ## Scoring methodology
 
 The Executive verdict score runs from 0 to 100 and combines five categories:
@@ -146,6 +162,22 @@ Classification: **Bullish** at 65+, **Watch** from 40 to 64, **Bearish** below
 
 Every band is shown in the UI under "Show how this score is built". They are
 chosen for teaching, not calibrated against realised returns.
+
+### Where the analyst data comes from
+
+Worth being precise about, because it differs by mode:
+
+- **With an Alpha Vantage key:** the rating distribution comes from the
+  `OVERVIEW` endpoint's `AnalystRatingStrongBuy` / `Buy` / `Hold` / `Sell` /
+  `StrongSell` fields, and the target from `AnalystTargetPrice`. Alpha Vantage
+  does not document which vendor it aggregates. The free tier publishes only a
+  current snapshot — **no rating history and no individual upgrades or
+  downgrades** — so those panels show an explicit "not available" rather than a
+  reconstruction.
+- **Without a key (sample data):** the distributions, targets, estimates and
+  firm-by-firm actions in `src/data/mockSeeds.ts` are **written by hand for this
+  project**. They are plausible, not real analyst coverage, and everything on
+  the page is labelled "Sample data" while they are in use.
 
 **Analyst opinion carries zero weight.** This is deliberate. If analyst ratings
 fed the score, the app would then compare the score against those same ratings

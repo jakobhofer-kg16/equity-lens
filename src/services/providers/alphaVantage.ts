@@ -40,6 +40,12 @@ const BENCHMARK_SYMBOL = 'SPY';
 const DAILY_OUTPUT_SIZE = 'compact';
 export const ALPHA_VANTAGE_DAILY_BARS = 100;
 
+/**
+ * Marker so the service layer can retract this warning once a longer series
+ * supersedes it. Two contradictory notes are worse than none.
+ */
+export const SHORT_HISTORY_NOTE = '\u0000short-history\u0000';
+
 type Json = Record<string, unknown>;
 
 function num(value: unknown): number | null {
@@ -246,7 +252,7 @@ export function createAlphaVantageProvider(apiKey: string): StockDataProvider {
       const notes: string[] = [];
       if (bars.length <= ALPHA_VANTAGE_DAILY_BARS) {
         notes.push(
-          `Alpha Vantage's free tier returns ${bars.length} daily bars (about ${Math.round((bars.length / 21) * 10) / 10} months). The 200-day average and the one-year return need more history — add a Twelve Data key to load several years.`
+          `${SHORT_HISTORY_NOTE}Alpha Vantage's free tier returns ${bars.length} daily bars (about ${Math.round((bars.length / 21) * 10) / 10} months). The 200-day average and the one-year return need more history — add a Twelve Data key to load several years.`
         );
       }
       const annual = parseStatements(settled(income), settled(balance), settled(cash));
