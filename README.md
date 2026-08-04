@@ -55,10 +55,18 @@ tiers of several services, for three reasons:
 3. The free key allows unlimited daily requests for verified educational
    projects — the standard free limit is otherwise 25 requests/day.
 
-Free-tier limits worth knowing: data is **end-of-day**, because intraday US
-market data is premium-only under exchange rules. One dossier costs up to eight
-requests, so responses are cached for 10 minutes and identical in-flight
-requests are de-duplicated.
+Free-tier limits worth knowing:
+
+- Data is **end-of-day**. Intraday US market data is premium-only under exchange
+  rules.
+- `outputsize=full` on `TIME_SERIES_DAILY` is **also premium**, so a free key
+  gets `compact` — the most recent 100 sessions, roughly five months. That is
+  not enough for a 200-day average or a one-year return, so both report as
+  unavailable rather than being computed over a shorter window and mislabelled.
+  **Add a Twelve Data key for multi-year history**; it takes over the price
+  series when present.
+- One dossier costs up to eight requests, so responses are cached for 10 minutes
+  and identical in-flight requests are de-duplicated.
 
 ### Entering keys
 

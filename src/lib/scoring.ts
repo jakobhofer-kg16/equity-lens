@@ -114,6 +114,16 @@ function relativeToMedian(value: number | null, median: number | null): number |
   return value / median;
 }
 
+/**
+ * A one-year return needs a year of bars and a 200-day average needs 200 of
+ * them. Computing either over a shorter window and keeping the label would be
+ * quietly wrong, so both report null instead — the score then redistributes the
+ * weight, and the UI shows "n/a". This matters because Alpha Vantage's free tier
+ * only returns 100 daily bars.
+ */
+const BARS_FOR_ONE_YEAR = 240;
+const BARS_FOR_200DMA = 200;
+
 export function computeMomentumInput(dossier: CompanyDossier): MomentumInput {
   const bars = dossier.prices.bars;
   const quote = dossier.quote;
@@ -122,18 +132,19 @@ export function computeMomentumInput(dossier: CompanyDossier): MomentumInput {
   }
 
   const last = bars[bars.length - 1].close;
-  const yearAgoIndex = Math.max(0, bars.length - 253);
-  const yearAgo = bars[yearAgoIndex].close;
-  const oneYearReturn = bars.length > 60 && yearAgo > 0 ? last / yearAgo - 1 : null;
+  const yearAgo = bars.length >= BARS_FOR_ONE_YEAR ? bars[bars.length - 253]?.close ?? bars[0].close : null;
+  const oneYearReturn = yearAgo && yearAgo > 0 ? last / yearAgo - 1 : null;
 
+  // The 52-week range comes from the provider's own overview rather than the
+  // series, so it survives a short price history.
   const high = quote.week52High;
   const low = quote.week52Low;
   const range52Position =
     high !== null && low !== null && high > low ? (quote.price - low) / (high - low) : null;
 
-  const window = bars.slice(-200);
+  const window = bars.slice(-BARS_FOR_200DMA);
   const dma200 =
-    window.length >= 100 ? window.reduce((sum, b) => sum + b.close, 0) / window.length : null;
+    window.length >= BARS_FOR_200DMA ? window.reduce((sum, b) => sum + b.close, 0) / window.length : null;
   const priceVs200dma = dma200 && dma200 > 0 ? quote.price / dma200 - 1 : null;
 
   return { oneYearReturn, range52Position, priceVs200dma };

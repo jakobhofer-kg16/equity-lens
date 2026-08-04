@@ -107,7 +107,9 @@ export function CandlestickChart({ prices, benchmark, earnings = [], currency = 
     }
 
     const end = bars.length - 1;
-    if (range === 'ALL') return [0, end];
+    // A preset the history cannot fill falls back to everything loaded, so the
+    // selected button never disagrees with what is drawn.
+    if (range === 'ALL' || (range !== 'YTD' && bars.length < RANGE_DAYS[range] * 0.9)) return [0, end];
     if (range === 'YTD') {
       const year = bars[end].date.slice(0, 4);
       const s = bars.findIndex((b) => b.date >= `${year}-01-01`);
@@ -248,10 +250,21 @@ export function CandlestickChart({ prices, benchmark, earnings = [], currency = 
     };
   })();
 
+  const rangeUnavailable = (key: RangeKey): boolean =>
+    key !== 'ALL' && key !== 'YTD' && bars.length < RANGE_DAYS[key] * 0.9;
+
+  const effectiveRange: RangeKey = rangeUnavailable(range) ? 'ALL' : range;
+
   const activeRangeButton = (key: RangeKey) =>
-    !customFrom && !customTo && range === key
+    !customFrom && !customTo && effectiveRange === key
       ? 'bg-slate-900 text-white'
       : 'bg-white text-slate-600 hover:bg-slate-100';
+
+  /**
+   * Offering "5Y" over five months of data would show the same chart under a
+   * different label, so those presets are disabled and say why on hover.
+   */
+  const historyMonths = Math.round((bars.length / 21) * 10) / 10;
 
   return (
     <div ref={wrapRef} className="w-full">
@@ -262,13 +275,19 @@ export function CandlestickChart({ prices, benchmark, earnings = [], currency = 
             <button
               key={key}
               type="button"
-              aria-pressed={!customFrom && !customTo && range === key}
+              aria-pressed={!customFrom && !customTo && effectiveRange === key}
+              disabled={rangeUnavailable(key)}
+              title={
+                rangeUnavailable(key)
+                  ? `Only ${historyMonths} months of price history loaded. Add a Twelve Data key for multi-year history.`
+                  : undefined
+              }
               onClick={() => {
                 setRange(key);
                 setCustomFrom('');
                 setCustomTo('');
               }}
-              className={`px-2.5 py-1 text-xs font-semibold transition ${activeRangeButton(key)}`}
+              className={`px-2.5 py-1 text-xs font-semibold transition disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-300 ${activeRangeButton(key)}`}
             >
               {key}
             </button>

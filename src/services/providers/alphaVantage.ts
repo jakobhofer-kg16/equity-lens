@@ -29,6 +29,17 @@ import { consensusLabelOf, consensusScoreOf } from './mock';
 const BASE = 'https://www.alphavantage.co/query';
 const BENCHMARK_SYMBOL = 'SPY';
 
+/**
+ * `full` is a premium feature on TIME_SERIES_DAILY, so a free key can only ever
+ * fetch `compact` — the most recent 100 sessions, roughly five months. That is
+ * too short for a 200-day average or a one-year return, which is why a Twelve
+ * Data key (free, and generous on history) takes over the price series when one
+ * is configured. Anything the short window cannot support reports as
+ * unavailable rather than being computed over whatever happens to be loaded.
+ */
+const DAILY_OUTPUT_SIZE = 'compact';
+export const ALPHA_VANTAGE_DAILY_BARS = 100;
+
 type Json = Record<string, unknown>;
 
 function num(value: unknown): number | null {
@@ -68,6 +79,12 @@ async function call(fn: string, params: Record<string, string>, apiKey: string):
   if (note) {
     if (/rate limit|per day|frequency/i.test(note)) {
       throw new DataError('rate-limited', note, 60);
+    }
+    if (/premium/i.test(note)) {
+      throw new DataError(
+        'provider-error',
+        `Alpha Vantage requires a premium plan for this request: ${note.replace(/\s+/g, ' ').trim()}`
+      );
     }
     if (/apikey|api key|invalid/i.test(note)) {
       throw new DataError('no-api-key', note);
@@ -206,7 +223,7 @@ export function createAlphaVantageProvider(apiKey: string): StockDataProvider {
 
       const [overview, daily] = await Promise.all([
         call('OVERVIEW', { symbol }, apiKey),
-        call('TIME_SERIES_DAILY', { symbol, outputsize: 'full' }, apiKey)
+        call('TIME_SERIES_DAILY', { symbol, outputsize: DAILY_OUTPUT_SIZE }, apiKey)
       ]);
 
       if (!overview.Symbol) {
@@ -221,11 +238,17 @@ export function createAlphaVantageProvider(apiKey: string): StockDataProvider {
         call('CASH_FLOW', { symbol }, apiKey),
         call('EARNINGS', { symbol }, apiKey),
         call('NEWS_SENTIMENT', { tickers: symbol, limit: '20' }, apiKey),
-        call('TIME_SERIES_DAILY', { symbol: BENCHMARK_SYMBOL, outputsize: 'full' }, apiKey)
+        call('TIME_SERIES_DAILY', { symbol: BENCHMARK_SYMBOL, outputsize: DAILY_OUTPUT_SIZE }, apiKey)
       ]);
       const settled = (r: PromiseSettledResult<Json>) => (r.status === 'fulfilled' ? r.value : null);
 
       const bars = parseDailySeries(daily, symbol);
+      const notes: string[] = [];
+      if (bars.length <= ALPHA_VANTAGE_DAILY_BARS) {
+        notes.push(
+          `Alpha Vantage's free tier returns ${bars.length} daily bars (about ${Math.round((bars.length / 21) * 10) / 10} months). The 200-day average and the one-year return need more history — add a Twelve Data key to load several years.`
+        );
+      }
       const annual = parseStatements(settled(income), settled(balance), settled(cash));
       const price = bars[bars.length - 1]?.close ?? 0;
       const previousClose = bars[bars.length - 2]?.close ?? price;
@@ -250,7 +273,7 @@ export function createAlphaVantageProvider(apiKey: string): StockDataProvider {
           fetchedAt: new Date().toISOString(),
           freshness: 'end-of-day',
           isMock: false,
-          notes: []
+          notes
         },
         profile: {
           symbol,
