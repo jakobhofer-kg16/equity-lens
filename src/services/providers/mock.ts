@@ -295,7 +295,8 @@ function buildDossier(seed: CompanySeed): CompanyDossier {
       provider: 'Bundled sample data',
       fetchedAt: new Date().toISOString(),
       freshness: 'end-of-day',
-      isMock: true
+      isMock: true,
+      notes: []
     },
     profile: {
       symbol: seed.symbol,

@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { LineChart, Search, Star } from 'lucide-react';
+import { KeyRound, LineChart, Search, Star } from 'lucide-react';
 import { Pill } from './ui/primitives';
 
 const EXAMPLES = ['AAPL', 'MSFT', 'TSLA'];
@@ -7,12 +7,16 @@ const EXAMPLES = ['AAPL', 'MSFT', 'TSLA'];
 export function Header({
   onSearch,
   onToggleWatchlist,
+  onOpenKeys,
   watchlistCount,
+  configuredKeyCount,
   busy
 }: {
   onSearch: (symbol: string) => void;
   onToggleWatchlist: () => void;
+  onOpenKeys: () => void;
   watchlistCount: number;
+  configuredKeyCount: number;
   busy: boolean;
 }) {
   const [value, setValue] = useState('');
@@ -70,6 +74,18 @@ export function Header({
             Watchlist
             {watchlistCount > 0 ? (
               <span className="rounded-full bg-slate-900 px-1.5 text-xs text-white tabular-nums">{watchlistCount}</span>
+            ) : null}
+          </button>
+          <button
+            type="button"
+            onClick={onOpenKeys}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+            aria-label={`API keys, ${configuredKeyCount} configured`}
+          >
+            <KeyRound className="h-4 w-4" aria-hidden />
+            API keys
+            {configuredKeyCount > 0 ? (
+              <span className="rounded-full bg-emerald-600 px-1.5 text-xs text-white tabular-nums">{configuredKeyCount}</span>
             ) : null}
           </button>
           <Pill tone="amber">Educational use only</Pill>

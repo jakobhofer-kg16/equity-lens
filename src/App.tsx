@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Star, StarOff } from 'lucide-react';
+import { KeyRound, Star, StarOff } from 'lucide-react';
 import { DataError, type CompanyDossier } from './types';
-import { loadDossier, providerStatus } from './services';
+import { invalidateCache, loadDossier, providerStatus } from './services';
 import { scoreCompany } from './lib/scoring';
 import { useWatchlist } from './hooks/useWatchlist';
 import { Header } from './components/Header';
@@ -11,11 +11,13 @@ import { PricePerformance } from './components/PricePerformance';
 import { Fundamentals } from './components/Fundamentals';
 import { Valuation } from './components/Valuation';
 import { PeerComparison } from './components/PeerComparison';
+import { IndustryComparison } from './components/IndustryComparison';
 import { AnalystConsensus } from './components/AnalystConsensus';
 import { NewsCatalysts } from './components/NewsCatalysts';
 import { FunFacts } from './components/FunFacts';
 import { ThesisBuilder } from './components/ThesisBuilder';
 import { WatchlistPanel } from './components/Watchlist';
+import { ApiKeyPanel } from './components/ApiKeyPanel';
 import { Card, ErrorState, Skeleton } from './components/ui/primitives';
 
 const INITIAL_SYMBOL = 'AAPL';
@@ -57,6 +59,8 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<{ title: string; detail: string } | null>(null);
   const [watchlistOpen, setWatchlistOpen] = useState(false);
+  const [keysOpen, setKeysOpen] = useState(false);
+  const [status, setStatus] = useState(providerStatus);
 
   const watchlist = useWatchlist();
 
@@ -112,6 +116,8 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50">
       <Header
+        onOpenKeys={() => setKeysOpen(true)}
+        configuredKeyCount={Object.values(status.configured).filter(Boolean).length}
         onSearch={(next) => void fetchSymbol(next)}
         onToggleWatchlist={() => setWatchlistOpen(true)}
         watchlistCount={watchlist.entries.length}
@@ -119,11 +125,28 @@ export default function App() {
       />
 
       <main className="mx-auto max-w-6xl space-y-8 px-4 py-6">
-        {providerStatus.isMock ? (
-          <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        {status.isMock ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <span>
             Running on bundled sample data because no API key is configured. Full sample dossiers exist for{' '}
-            <strong>{providerStatus.sampleSymbols.join(', ')}</strong>. See the README to connect Alpha Vantage.
+            <strong>{status.sampleSymbols.join(', ')}</strong>. Add an Alpha Vantage key to analyze any US ticker.
+            </span>
+            <button
+              type="button"
+              onClick={() => setKeysOpen(true)}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-amber-400 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100"
+            >
+              <KeyRound className="h-3.5 w-3.5" aria-hidden /> Add API keys
+            </button>
           </div>
+        ) : null}
+
+        {dossier?.source.notes.length ? (
+          <ul className="rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-xs text-slate-500">
+            {dossier.source.notes.map((note) => (
+              <li key={note}>• {note}</li>
+            ))}
+          </ul>
         ) : null}
 
         {loading ? <DashboardSkeleton /> : null}
@@ -151,6 +174,7 @@ export default function App() {
             <Fundamentals dossier={dossier} />
             <Valuation dossier={dossier} />
             <PeerComparison dossier={dossier} />
+            <IndustryComparison dossier={dossier} />
             <AnalystConsensus dossier={dossier} score={score} />
             <NewsCatalysts dossier={dossier} />
             <FunFacts dossier={dossier} />
@@ -166,8 +190,8 @@ export default function App() {
             investment advice.
           </p>
           <p>
-            Data provider: {dossier?.source.provider ?? providerStatus.label}. Market data is{' '}
-            {dossier?.source.freshness ?? providerStatus.freshness} — not real time. Last updated{' '}
+            Data provider: {dossier?.source.provider ?? status.label}. Market data is{' '}
+            {dossier?.source.freshness ?? status.freshness} — not real time. Last updated{' '}
             {dossier ? new Date(dossier.source.fetchedAt).toLocaleString() : 'n/a'}.
           </p>
           <p>
@@ -176,6 +200,16 @@ export default function App() {
           </p>
         </div>
       </footer>
+
+      <ApiKeyPanel
+        open={keysOpen}
+        onClose={() => setKeysOpen(false)}
+        onSaved={() => {
+          invalidateCache();
+          setStatus(providerStatus());
+          void fetchSymbol(symbol);
+        }}
+      />
 
       <WatchlistPanel
         open={watchlistOpen}

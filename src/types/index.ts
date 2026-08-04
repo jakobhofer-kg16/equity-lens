@@ -16,6 +16,8 @@ export interface SourceInfo {
   freshness: DataFreshness;
   /** True when this came from bundled sample data rather than a live call. */
   isMock: boolean;
+  /** What each assembly layer did, shown to the reader. */
+  notes: string[];
 }
 
 export interface CompanyProfile {

@@ -249,7 +249,8 @@ export function createAlphaVantageProvider(apiKey: string): StockDataProvider {
           provider: 'Alpha Vantage',
           fetchedAt: new Date().toISOString(),
           freshness: 'end-of-day',
-          isMock: false
+          isMock: false,
+          notes: []
         },
         profile: {
           symbol,

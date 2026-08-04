@@ -35,6 +35,7 @@ npm run preview   # serve the production build
 | Business fundamentals | Is the business improving — trends, not a single latest number |
 | Valuation | Multiples against the sector median, with "not meaningful" where it applies |
 | Competitor comparison | How it stacks against a curated peer set |
+| Industry comparison | 1-year performance against the industry, plus the top 3 alternatives ranked on fundamentals |
 | Analyst consensus | What the sell side publishes, kept strictly separate from our model |
 | News and catalysts | Sourced headlines, model-scored sentiment, upcoming events |
 | Fun facts | Trivia and arithmetic curiosities. Entertainment, clearly labelled |
@@ -59,8 +60,27 @@ market data is premium-only under exchange rules. One dossier costs up to eight
 requests, so responses are cached for 10 minutes and identical in-flight
 requests are de-duplicated.
 
-Get a key at <https://www.alphavantage.co/support/#api-key>, copy
-`.env.example` to `.env.local`, and set `VITE_ALPHAVANTAGE_KEY`.
+### Entering keys
+
+Click **API keys** in the header. Keys are stored in this browser only, are sent
+nowhere except the provider they belong to, and are never written to the
+repository — which is what keeps the deployed page safe to share publicly.
+
+| Key | Env name | What it unlocks | Required |
+|---|---|---|---|
+| Alpha Vantage | `ALPHAVANTAGE_API_KEY` | Profile, fundamentals, valuation, analyst consensus | Recommended — without it everything is sample data |
+| Twelve Data | `TWELVE_DATA_API` | Daily price history for the chart, at a higher daily allowance | Optional |
+| newsdata.io | `NEWS_DATA_IO_API_KEY` | Live headlines in the news section | Optional |
+| OpenRouter | `OPENROUTER_API_KEY` | Narrative summary of the investment thesis | Optional |
+
+A dossier is assembled in layers: the base record comes from Alpha Vantage (or
+the bundled sample data), then each additional key replaces the slice it is
+better at. A layer that fails is reported as a note under the header rather than
+thrown, so a bad newsdata.io key costs you the news section and nothing else.
+
+For local development the same keys can be set as `VITE_`-prefixed variables in
+`.env.local`; see `.env.example`. Note that those are compiled into the bundle
+and are therefore public, so the panel is the better route.
 
 ### Providers evaluated and rejected
 
@@ -162,7 +182,15 @@ sample data.
   latest close, so charts are stable across reloads but are not real prices.
 - **Return on invested capital and current ratio are unavailable from the live
   provider** and show as "n/a" there; both are present in the sample data.
-- **The watchlist is per browser.** Clearing site data removes it.
+- **The watchlist and the API keys are per browser.** Clearing site data removes
+  both.
+- **The industry comparison universe is curated** (`src/data/universe.ts`) for
+  the same reason as the peer set. Alternatives are ranked on a reduced metric
+  set — growth, profitability and valuation against the sector median — because
+  that is all a comparison universe realistically carries.
+- **newsdata.io sentiment is keyword-classified in this app**, because the
+  provider only supplies a sentiment field on paid plans. The UI labels it as
+  model-scored rather than reported.
 
 ## Recommended next improvements
 
