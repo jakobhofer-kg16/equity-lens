@@ -106,8 +106,9 @@ export interface MomentumInput {
 }
 
 /**
- * Valuation is scored relative to the sector median, not against an absolute
- * multiple, because "expensive" only means anything next to a comparison set.
+ * Valuation is scored relative to the median of the real peer set, not against
+ * an absolute multiple, because "expensive" only means anything next to a
+ * comparison set.
  */
 function relativeToMedian(value: number | null, median: number | null): number | null {
   if (value === null || median === null || median <= 0 || value <= 0) return null;
@@ -225,12 +226,12 @@ function profitabilityCategory(r: FinancialRatios): CategoryScore {
 }
 
 function valuationCategory(r: FinancialRatios, peers: PeerSet): CategoryScore {
-  const peRelative = relativeToMedian(r.trailingPE, peers.sectorMedian.trailingPE);
-  const evRelative = relativeToMedian(r.evToEbitda, peers.sectorMedian.evToEbitda);
+  const peRelative = relativeToMedian(r.trailingPE, peers.peerMedian.trailingPE);
+  const evRelative = relativeToMedian(r.evToEbitda, peers.peerMedian.evToEbitda);
 
   const metrics = [
     buildMetric({
-      label: 'P/E vs sector median',
+      label: 'P/E vs peer median',
       value: peRelative,
       format: (v) => `${v.toFixed(2)}x median`,
       atZero: 1.6,
@@ -238,7 +239,7 @@ function valuationCategory(r: FinancialRatios, peers: PeerSet): CategoryScore {
       band: '60% of the median scores 100, 160% scores 0'
     }),
     buildMetric({
-      label: 'EV/EBITDA vs sector median',
+      label: 'EV/EBITDA vs peer median',
       value: evRelative,
       format: (v) => `${v.toFixed(2)}x median`,
       atZero: 1.6,

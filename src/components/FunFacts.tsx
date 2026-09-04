@@ -20,7 +20,7 @@ export function FunFacts({ dossier }: { dossier: CompanyDossier }) {
     <Section
       id="fun-facts"
       title="Fun facts"
-      subtitle="Trivia and arithmetic curiosities. Entertainment only — none of this feeds the score or the thesis."
+      subtitle="Arithmetic curiosities computed from the loaded data. Entertainment only — none of this feeds the score or the thesis."
       action={<Pill tone="slate">Not analysis</Pill>}
     >
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -31,9 +31,7 @@ export function FunFacts({ dossier }: { dossier: CompanyDossier }) {
               <Icon className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" aria-hidden />
               <div>
                 <p className="text-sm leading-relaxed text-slate-700">{fact.text}</p>
-                <p className="mt-1.5 text-[11px] text-slate-400">
-                  {fact.isCurated ? 'Hand-written trivia' : 'Computed from the data on this page'}
-                </p>
+                <p className="mt-1.5 text-[11px] text-slate-400">Computed from the data on this page</p>
               </div>
             </Card>
           );

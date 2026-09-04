@@ -2,32 +2,21 @@
  * Service facade.
  *
  * Components call `loadDossier` and never touch a provider directly. A dossier
- * is assembled in layers: a base provider supplies the full record, then any
- * additional key the user has entered replaces the slice it is better at. Each
- * layer is optional and each failure is recorded rather than thrown, so one
- * missing key degrades one section instead of the page.
+ * is assembled in layers: Finnhub supplies the record, then each additional
+ * key replaces the slice it is better at. Nothing here is invented — with no
+ * Finnhub key the facade refuses rather than substituting sample data.
  */
 
 import { DataError, type CompanyDossier } from '../types';
-import { mockProvider } from './providers/mock';
-import {
-  createAlphaVantageProvider,
-  fetchAlphaVantageDaily,
-  SHORT_HISTORY_NOTE
-} from './providers/alphaVantage';
-import { createFinnhubProvider, fetchAlphaVantagePriceTarget } from './providers/finnhub';
+import { createFinnhubProvider } from './providers/finnhub';
+import { fetchAlphaVantageDaily, fetchAlphaVantagePriceTarget, ALPHA_VANTAGE_DAILY_BARS } from './providers/alphaVantage';
 import { fetchTwelveDataPrices } from './providers/twelveData';
 import { fetchNewsDataHeadlines } from './providers/newsData';
 import { getKeys } from './keys';
-import { SUPPORTED_MOCK_SYMBOLS } from '../data/mockSeeds';
 
-/**
- * A free Alpha Vantage key allows 25 requests a day and one dossier costs
- * several, so the cache is persisted. Without it a page refresh would silently
- * spend another chunk of the daily budget on data already fetched.
- */
+/** Dossiers are persisted so a refresh does not re-spend request budgets. */
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
-const CACHE_STORAGE_KEY = 'equity-lens.dossier-cache.v1';
+const CACHE_STORAGE_KEY = 'equity-lens.dossier-cache.v2';
 const MAX_CACHED_SYMBOLS = 8;
 const BENCHMARK_SYMBOL = 'SPY';
 
@@ -48,29 +37,24 @@ function readCache(): Map<string, CacheEntry> {
   }
 }
 
+const cache = readCache();
+const inFlight = new Map<string, Promise<CompanyDossier>>();
+
 function persistCache(): void {
   try {
-    // Newest first, so the trim keeps what was looked at most recently.
     const entries = [...cache.entries()].sort((a, b) => b[1].at - a[1].at).slice(0, MAX_CACHED_SYMBOLS);
     localStorage.setItem(CACHE_STORAGE_KEY, JSON.stringify(entries));
   } catch {
-    // Quota exceeded or storage blocked: the in-memory cache still works for
-    // this page load, which is the case that matters most.
+    // Quota exceeded or storage blocked: the in-memory cache still works.
   }
 }
 
-const cache = readCache();
-/** In-flight requests, so a double click cannot fire the same call twice. */
-const inFlight = new Map<string, Promise<CompanyDossier>>();
-
 export function providerStatus() {
   const keys = getKeys();
-  const label = keys.finnhub ? 'Finnhub' : keys.alphaVantage ? 'Alpha Vantage' : 'Bundled sample data';
   return {
-    isMock: !keys.finnhub && !keys.alphaVantage,
-    label,
-    freshness: (keys.finnhub ? 'delayed' : 'end-of-day') as 'delayed' | 'end-of-day',
-    sampleSymbols: SUPPORTED_MOCK_SYMBOLS,
+    ready: Boolean(keys.finnhub),
+    label: keys.finnhub ? 'Finnhub' : 'No data provider configured',
+    freshness: 'delayed' as const,
     configured: {
       finnhub: Boolean(keys.finnhub),
       alphaVantage: Boolean(keys.alphaVantage),
@@ -81,7 +65,6 @@ export function providerStatus() {
   };
 }
 
-/** Cache entries are per key set, so entering a key refreshes the view. */
 function signatureOf(): string {
   const keys = getKeys();
   return [keys.finnhub, keys.alphaVantage, keys.twelveData, keys.newsData].map((k) => (k ? '1' : '0')).join('');
@@ -96,115 +79,63 @@ export function invalidateCache(): void {
   }
 }
 
-/** Symbols that can be reopened without spending any request budget. */
 export function cachedSymbols(): string[] {
   const signature = signatureOf();
   return [...cache.entries()]
-    .filter(([, entry]) => entry.keySignature === signature && Date.now() - entry.at < CACHE_TTL_MS)
+    .filter(([, e]) => e.keySignature === signature && Date.now() - e.at < CACHE_TTL_MS)
     .sort((a, b) => b[1].at - a[1].at)
     .map(([symbol]) => symbol);
 }
 
 async function assemble(symbol: string): Promise<CompanyDossier> {
   const keys = getKeys();
+  if (!keys.finnhub) {
+    throw new DataError('no-api-key', 'A Finnhub key is required. Add one under API keys — the free plan is enough.');
+  }
   const notes: string[] = [];
 
-  // The optional providers run FIRST, because whether they succeed decides what
-  // the base provider still has to fetch. Deciding to skip an Alpha Vantage
-  // request before knowing that its replacement worked leaves the page with
-  // neither — the skip has to be earned, not assumed.
-  let prices: Awaited<ReturnType<typeof fetchTwelveDataPrices>> | null = null;
-  let benchmark: Awaited<ReturnType<typeof fetchTwelveDataPrices>> | null = null;
+  // Price history first, because Finnhub does not carry it on the free plan.
+  let prices: CompanyDossier['prices'] | null = null;
+  let benchmark: CompanyDossier['benchmark'] | null = null;
 
   if (keys.twelveData) {
     try {
       const [main, bench] = await Promise.all([
         fetchTwelveDataPrices(symbol, keys.twelveData),
-        // The benchmark must come from the same source, otherwise the indexed
-        // comparison runs a multi-year series against a much shorter one.
         fetchTwelveDataPrices(BENCHMARK_SYMBOL, keys.twelveData).catch(() => null)
       ]);
       prices = main;
-      benchmark = bench;
-      const years = Math.round((main.bars.length / 252) * 10) / 10;
+      benchmark = bench ? { ...bench, symbol: 'S&P 500 (SPY)' } : null;
       notes.push(
-        `Price history from Twelve Data: ${main.bars.length} daily bars (about ${years} years). The one-year return and the 200-day average are computed from this series.`
+        `Price history from Twelve Data: ${main.bars.length} daily bars (about ${Math.round((main.bars.length / 252) * 10) / 10} years).`
       );
-      if (!bench) notes.push('Benchmark series unavailable from Twelve Data, falling back to the base provider.');
     } catch (err) {
-      notes.push(`Twelve Data prices unavailable, falling back to the base provider: ${(err as Error).message}`);
+      notes.push(`Twelve Data prices unavailable: ${(err as Error).message}`);
     }
   }
 
-  let news: Awaited<ReturnType<typeof fetchNewsDataHeadlines>> | null = null;
-  let newsPending = false;
-  if (keys.newsData) {
-    // The company name is only known after the base provider answers, so the
-    // headline call is deferred; the base provider must still fetch its own.
-    newsPending = true;
-  }
+  let dossier = await createFinnhubProvider(keys.finnhub).getDossier(symbol);
 
-  // Finnhub first: 60 requests a minute against Alpha Vantage's 25 a day, and
-  // it carries the ratio history, the real peer set and the rating trend.
-  const base = keys.finnhub
-    ? createFinnhubProvider(keys.finnhub)
-    : keys.alphaVantage
-      ? createAlphaVantageProvider(keys.alphaVantage, { skipPrices: Boolean(prices), skipNews: false })
-      : mockProvider;
-
-  let dossier: CompanyDossier;
-  try {
-    dossier = await base.getDossier(symbol);
-  } catch (err) {
-    // With a live key configured, fall back to sample data rather than leaving
-    // the page empty — but only where a sample exists, and the UI still says so.
-    const kind = err instanceof DataError ? err.kind : 'provider-error';
-    if (base !== mockProvider && mockProvider.supports(symbol) && (kind === 'rate-limited' || kind === 'network')) {
-      dossier = await mockProvider.getDossier(symbol);
-      dossier.source.notes.push(`Alpha Vantage unavailable (${kind}), showing sample data instead.`);
-    } else {
-      throw err;
+  if (!prices && keys.alphaVantage) {
+    try {
+      const fallback = await fetchAlphaVantageDaily(symbol, keys.alphaVantage);
+      prices = fallback.prices;
+      benchmark = fallback.benchmark;
+      notes.push(
+        `Price history from Alpha Vantage: ${fallback.prices.bars.length} daily bars — its free plan stops at ${ALPHA_VANTAGE_DAILY_BARS}. A Twelve Data key gives several years.`
+      );
+    } catch (err) {
+      notes.push(`Alpha Vantage prices unavailable: ${(err as Error).message}`);
     }
   }
 
   if (prices) {
-    // A longer series supersedes the base provider's short-history warning;
-    // two contradictory notes are worse than none.
-    dossier.source.notes = dossier.source.notes.filter((note) => !note.startsWith(SHORT_HISTORY_NOTE));
-    dossier = {
-      ...dossier,
-      prices,
-      benchmark: benchmark ? { ...benchmark, symbol: 'S&P 500 (SPY)' } : dossier.benchmark
-    };
+    dossier = { ...dossier, prices, benchmark: benchmark ?? dossier.benchmark };
+  } else {
+    notes.push('No price history: Finnhub keeps it behind a paid plan. Add a Twelve Data key (free, multi-year) to fill the chart.');
   }
 
-  // Finnhub has no price history on the free plan, so if Twelve Data did not
-  // cover it, Alpha Vantage is the last resort before the chart goes empty.
-  if (keys.finnhub && !prices && keys.alphaVantage && !dossier.prices.bars.length) {
-    try {
-      const fallback = await fetchAlphaVantageDaily(symbol, keys.alphaVantage);
-      dossier = {
-        ...dossier,
-        prices: fallback.prices,
-        benchmark: fallback.benchmark ?? dossier.benchmark
-      };
-      notes.push(
-        `Price history from Alpha Vantage: ${fallback.bars} daily bars. Finnhub keeps prices behind a paid plan; a Twelve Data key gives several years instead.`
-      );
-    } catch (err) {
-      notes.push(`Price history unavailable: ${(err as Error).message}`);
-    }
-  }
-
-  if (keys.finnhub && !dossier.prices.bars.length) {
-    notes.push(
-      'No price history: Finnhub keeps it behind a paid plan. Add a Twelve Data key (free, multi-year) to fill the chart.'
-    );
-  }
-
-  // Finnhub keeps price targets behind a paid plan, but Alpha Vantage publishes
-  // one for free. Worth exactly one request out of the 25 daily budget.
-  if (keys.finnhub && keys.alphaVantage && !dossier.priceTargets) {
+  if (keys.alphaVantage) {
     try {
       const target = await fetchAlphaVantagePriceTarget(symbol, keys.alphaVantage);
       if (target) {
@@ -222,24 +153,22 @@ async function assemble(symbol: string): Promise<CompanyDossier> {
         };
         notes.push('Consensus price target from Alpha Vantage (one request).');
       }
-    } catch {
-      notes.push('Alpha Vantage price target unavailable.');
+    } catch (err) {
+      notes.push(`Alpha Vantage price target unavailable: ${(err as Error).message}`);
     }
   }
 
-  if (newsPending) {
+  if (keys.newsData) {
     try {
-      news = await fetchNewsDataHeadlines(symbol, dossier.profile.name, keys.newsData);
+      const news = await fetchNewsDataHeadlines(symbol, dossier.profile.name, keys.newsData);
       dossier = { ...dossier, news };
       notes.push('Headlines from newsdata.io.');
     } catch (err) {
-      notes.push(`newsdata.io headlines unavailable, keeping the base provider's: ${(err as Error).message}`);
+      notes.push(`newsdata.io headlines unavailable, keeping Finnhub coverage: ${(err as Error).message}`);
     }
   }
 
-  dossier.source.notes = [...dossier.source.notes, ...notes].map((note) =>
-    note.replace(SHORT_HISTORY_NOTE, '')
-  );
+  dossier.source.notes = [...dossier.source.notes, ...notes];
   return dossier;
 }
 
@@ -251,9 +180,7 @@ export async function loadDossier(rawSymbol: string, options: { force?: boolean 
 
   const signature = signatureOf();
   const hit = cache.get(symbol);
-  if (!options.force && hit && hit.keySignature === signature && Date.now() - hit.at < CACHE_TTL_MS) {
-    return hit.value;
-  }
+  if (!options.force && hit && hit.keySignature === signature && Date.now() - hit.at < CACHE_TTL_MS) return hit.value;
 
   const pending = inFlight.get(symbol);
   if (pending) return pending;

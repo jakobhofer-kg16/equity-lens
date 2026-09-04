@@ -14,10 +14,7 @@ export function IndustryComparison({ dossier }: { dossier: CompanyDossier }) {
   if (!performance.constituents.length || !alternatives.length) {
     return (
       <Section id="industry" title="Industry comparison">
-        <EmptyState
-          title="No comparison universe for this sector"
-          detail={`The bundled universe does not cover ${dossier.profile.sector ?? 'this sector'} yet, so there is nothing meaningful to rank ${symbol} against.`}
-        />
+        <EmptyState title="No peers to rank" detail={`Finnhub returned no peer set for ${symbol}, so there is nothing to compare against.`} />
       </Section>
     );
   }
@@ -29,16 +26,16 @@ export function IndustryComparison({ dossier }: { dossier: CompanyDossier }) {
   return (
     <Section
       id="industry"
-      title="Industry comparison and alternatives"
-      subtitle="Two separate questions: how the stock has performed against its industry, and which names in that industry look stronger on fundamentals. A laggard can still be the best business in the group."
+      title="Peer performance and alternatives"
+      subtitle="Two separate questions: how the stock has performed against its peers, and which of them look stronger on fundamentals. A laggard can still be the best business in the group."
       action={<GeneratedBadge label="Model output" />}
     >
       <div className="space-y-3">
         <Card className="p-5">
           <div className="flex flex-wrap items-baseline justify-between gap-3">
             <h3 className="text-sm font-semibold text-slate-900">
-              1-year performance vs {performance.sector ?? 'sector'}
-              {performance.industry ? <span className="font-normal text-slate-500"> · {performance.industry}</span> : null}
+              1-year performance vs {performance.constituents.length - 1} Finnhub peers
+              {performance.sector ? <span className="font-normal text-slate-500"> · {performance.sector}</span> : null}
             </h3>
             {performance.spread !== null ? (
               <Pill tone={outperforming ? 'green' : 'red'}>
@@ -55,8 +52,8 @@ export function IndustryComparison({ dossier }: { dossier: CompanyDossier }) {
               </strong>
             </span>
             <span>
-              Industry median:{' '}
-              <strong className="tabular-nums text-slate-900">{formatPercent(performance.industryMedianReturn, 1, true)}</strong>
+              Peer median:{' '}
+              <strong className="tabular-nums text-slate-900">{formatPercent(performance.peerMedianReturn, 1, true)}</strong>
             </span>
             <span className="text-slate-400">{performance.constituents.length} companies</span>
           </div>
@@ -100,8 +97,8 @@ export function IndustryComparison({ dossier }: { dossier: CompanyDossier }) {
             <h3 className="text-sm font-semibold text-slate-900">Top 3 alternatives in this industry</h3>
           </div>
           <p className="mt-1 text-sm text-slate-500">
-            Ranked on growth, profitability and valuation against the sector median — the same emphasis as the main
-            score, on the reduced metric set a comparison universe carries. Analyst views play no part.
+            Ranked on growth, profitability and valuation against the peer median — the same emphasis as the main
+            score, on the metrics Finnhub carries per peer. Analyst views play no part.
           </p>
 
           <div className="mt-4 grid gap-3 lg:grid-cols-3">
@@ -114,7 +111,6 @@ export function IndustryComparison({ dossier }: { dossier: CompanyDossier }) {
                   </div>
                   <span className="text-lg font-bold tabular-nums text-slate-900">{alt.score}</span>
                 </div>
-                <p className="mt-0.5 text-xs text-slate-400">{alt.industry}</p>
 
                 <p className="mt-2 text-sm text-slate-700">{alt.rationale}</p>
 

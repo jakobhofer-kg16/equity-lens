@@ -14,7 +14,7 @@ export interface SourceInfo {
   provider: string;
   fetchedAt: string;
   freshness: DataFreshness;
-  /** True when this came from bundled sample data rather than a live call. */
+  /** Kept for the type contract; every live provider sets it false. */
   isMock: boolean;
   /** What each assembly layer did, shown to the reader. */
   notes: string[];
@@ -133,8 +133,13 @@ export interface PeerCompany {
 export interface PeerSet {
   symbol: string;
   sector: string | null;
-  /** Sector medians used as the valuation reference in the score. */
-  sectorMedian: Pick<PeerCompany, 'trailingPE' | 'evToEbitda' | 'operatingMargin' | 'returnOnEquity'>;
+  /**
+   * Median of the peer set below, computed from the same provider figures.
+   * This is the valuation reference in the score — nothing is hand-set.
+   */
+  peerMedian: Pick<PeerCompany, 'trailingPE' | 'evToEbitda' | 'operatingMargin' | 'returnOnEquity'>;
+  /** The company itself in the same shape, so comparisons use one definition. */
+  self: PeerCompany | null;
   peers: PeerCompany[];
 }
 

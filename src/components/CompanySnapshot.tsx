@@ -80,7 +80,11 @@ export function CompanySnapshot({ dossier }: { dossier: CompanyDossier }) {
           </div>
         </div>
 
-        <p className="mt-4 max-w-3xl text-sm leading-relaxed text-slate-600">{profile.description}</p>
+        {profile.description ? (
+          <p className="mt-4 max-w-3xl text-sm leading-relaxed text-slate-600">{profile.description}</p>
+        ) : (
+          <p className="mt-4 text-xs text-slate-400">Finnhub does not supply a business description on the free plan.</p>
+        )}
 
         <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           <Metric label="Market cap" value={formatBigMoney(profile.marketCap, profile.currency)} />

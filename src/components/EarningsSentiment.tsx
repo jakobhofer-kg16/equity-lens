@@ -1,12 +1,8 @@
-import { useEffect, useState } from 'react';
 import { ExternalLink, Mic, Quote } from 'lucide-react';
-import {
-  fetchEarningsSentiment,
-  hasEarningsArchive,
-  type EarningsSentimentResult,
-  type QuarterSentiment
-} from '../services/providers/earningsCalls';
+import type { EarningsSentimentResult, QuarterSentiment } from '../services/providers/earningsCalls';
 import type { SentimentScore } from '../lib/sentiment';
+import type { PriceBar } from '../types';
+import { callReactions, REACTION_DAYS } from '../lib/callReactions';
 import { Card, EmptyState, ErrorState, GeneratedBadge, Pill, Section, Skeleton } from './ui/primitives';
 import { formatDate, formatPercent } from '../lib/format';
 
@@ -89,39 +85,26 @@ function Highlight({ line, tone }: { line: NonNullable<QuarterSentiment['highlig
   );
 }
 
-export function EarningsSentiment({ symbol }: { symbol: string }) {
-  const [result, setResult] = useState<EarningsSentimentResult | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    setResult(null);
-    setError(null);
-
-    if (!hasEarningsArchive(symbol)) return;
-
-    setLoading(true);
-    fetchEarningsSentiment(symbol)
-      .then((value) => {
-        if (!cancelled) setResult(value);
-      })
-      .catch((err: Error) => {
-        if (!cancelled) setError(err.message);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [symbol]);
+export function EarningsSentiment({
+  symbol,
+  result,
+  loading,
+  error,
+  available,
+  bars
+}: {
+  symbol: string;
+  result: EarningsSentimentResult | null;
+  loading: boolean;
+  error: string | null;
+  available: boolean;
+  bars: PriceBar[];
+}) {
 
   const subtitle =
     'Scored with a finance-specific word list. General sentiment lexicons read "liability", "cost" and "depreciation" as negative, which on an earnings call mostly measures how much accounting was discussed.';
 
-  if (!hasEarningsArchive(symbol)) {
+  if (!available) {
     return (
       <Section id="earnings-sentiment" title="Earnings call sentiment" subtitle={subtitle}>
         <EmptyState
@@ -133,6 +116,9 @@ export function EarningsSentiment({ symbol }: { symbol: string }) {
   }
 
   const latest = result?.quarters[result.quarters.length - 1] ?? null;
+  const reactions = result && bars.length ? callReactions(result.quarters, bars) : [];
+  const judged = reactions.filter((r) => r.agree !== null);
+  const agreed = judged.filter((r) => r.agree).length;
 
   return (
     <Section
@@ -158,6 +144,48 @@ export function EarningsSentiment({ symbol }: { symbol: string }) {
               <QuarterCard key={quarter.date} quarter={quarter} isLatest={i === result.quarters.length - 1} />
             ))}
           </div>
+
+          {reactions.length ? (
+            <Card className="p-4">
+              <h3 className="text-sm font-semibold text-slate-900">Did the tone anticipate the price reaction?</h3>
+              <p className="mt-1 text-sm text-slate-500">
+                Change in call tone against the previous call, next to the share price move over the {REACTION_DAYS} sessions
+                after the call. {judged.length ? `Same direction in ${agreed} of ${judged.length} comparable calls.` : 'Not enough overlap between calls and price history to compare.'}
+              </p>
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-left text-xs tracking-wide text-slate-500 uppercase">
+                      <th scope="col" className="py-2 pr-4 font-medium">Call</th>
+                      <th scope="col" className="py-2 pr-4 text-right font-medium">Tone Δ vs prior</th>
+                      <th scope="col" className="py-2 pr-4 text-right font-medium">Price, next {REACTION_DAYS} sessions</th>
+                      <th scope="col" className="py-2 text-right font-medium">Direction</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reactions.map((r) => (
+                      <tr key={r.date} className="border-b border-slate-100 last:border-0">
+                        <td className="py-2 pr-4 text-slate-700">{formatDate(r.date)}</td>
+                        <td className={`py-2 pr-4 text-right tabular-nums ${r.toneDelta === null ? 'text-slate-400' : r.toneDelta >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                          {r.toneDelta === null ? 'first call' : `${r.toneDelta >= 0 ? '+' : ''}${r.toneDelta.toFixed(2)}`}
+                        </td>
+                        <td className={`py-2 pr-4 text-right tabular-nums ${r.reaction === null ? 'text-slate-400' : r.reaction >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                          {r.reaction === null ? 'no prices' : formatPercent(r.reaction, 1, true)}
+                        </td>
+                        <td className="py-2 text-right">
+                          {r.agree === null ? <span className="text-slate-400">—</span> : <Pill tone={r.agree ? 'green' : 'red'}>{r.agree ? 'same' : 'opposite'}</Pill>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="mt-2 text-xs text-slate-500">
+                Four calls are far too few to conclude anything about this company; the point is to see the two side by
+                side. A word-count tone and a five-day price move are both noisy.
+              </p>
+            </Card>
+          ) : null}
 
           {latest ? (
             <Card className="p-4">

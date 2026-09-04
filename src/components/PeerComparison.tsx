@@ -23,7 +23,7 @@ const COLUMNS: Column[] = [
 export function PeerComparison({ dossier }: { dossier: CompanyDossier }) {
   const { peers, ratios, profile } = dossier;
 
-  const self = {
+  const self = peers.self ?? {
     symbol: profile.symbol,
     name: profile.name,
     marketCap: profile.marketCap,
@@ -41,7 +41,7 @@ export function PeerComparison({ dossier }: { dossier: CompanyDossier }) {
   if (!peers.peers.length) {
     return (
       <Section id="peers" title="Competitor comparison">
-        <EmptyState title="No peer set defined" detail={`No comparison group is configured for ${profile.symbol}.`} />
+        <EmptyState title="No peers returned" detail={`Finnhub lists no peers for ${profile.symbol}.`} />
       </Section>
     );
   }
@@ -49,10 +49,7 @@ export function PeerComparison({ dossier }: { dossier: CompanyDossier }) {
   if (!hasPeerData) {
     return (
       <Section id="peers" title="Competitor comparison" subtitle={`Peer group: ${peers.peers.map((p) => p.symbol).join(', ')}`}>
-        <EmptyState
-          title="Peer metrics not loaded"
-          detail="Each peer costs one additional provider request, which exceeds the free daily budget. Peer figures are populated when running on sample data or with a higher-volume key."
-        />
+        <EmptyState title="Peer metrics not loaded" detail="Finnhub returned peers but their metric requests failed. Retry in a minute." />
       </Section>
     );
   }
@@ -63,7 +60,7 @@ export function PeerComparison({ dossier }: { dossier: CompanyDossier }) {
     <Section
       id="peers"
       title="Competitor comparison"
-      subtitle="Green marks the better reading on metrics where a direction is meaningful. Debt and one-year return are left uncoloured — neither is simply better when higher."
+      subtitle={`Finnhub's own peer list for ${profile.symbol}, with each peer's live metrics. Green marks the better reading where a direction is meaningful; debt and one-year return are left uncoloured.`}
     >
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">

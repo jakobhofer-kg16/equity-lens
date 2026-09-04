@@ -2,20 +2,18 @@
  * Fun facts. Explicitly entertainment, not part of the investment case, and
  * never fed into the score.
  *
- * Two kinds are mixed: hand-written trivia for the tickers we have it for, and
- * facts computed from the loaded data so any ticker gets something. Computed
- * facts are honest arithmetic on the same series the charts use — the joke is
- * the framing, not the number.
+ * Every fact is computed from the loaded data — honest arithmetic on the same
+ * series the charts use. The joke is the framing, not the number. Nothing is
+ * hand-written, so any ticker gets the same treatment.
  */
 
 import type { CompanyDossier } from '../types';
-import { TRIVIA } from '../data/trivia';
 import { formatBigMoney, formatCurrency, formatNumber, formatPercent } from './format';
 
 export interface FunFact {
   icon: 'chart' | 'globe' | 'clock' | 'dice' | 'flame' | 'book';
   text: string;
-  /** True for hand-written trivia, false for facts derived from the data. */
+  /** Always false now; kept so the UI contract does not change. */
   isCurated: boolean;
 }
 
@@ -166,8 +164,5 @@ export function buildFunFacts(dossier: CompanyDossier): FunFact[] {
     });
   }
 
-  const curated = TRIVIA[profile.symbol] ?? [];
-  const curatedFacts: FunFact[] = curated.map((text) => ({ icon: 'book', text, isCurated: true }));
-
-  return [...curatedFacts, ...facts];
+  return facts;
 }

@@ -6,6 +6,10 @@ It is not a price predictor. The point is to turn scattered financial data into 
 readable, transparent investment thesis — and to be explicit about where every
 number came from, how old it is, and which parts are opinion rather than fact.
 
+**Nothing on the page is invented.** There is no bundled sample company, no
+hand-written peer list, no curated sector median and no trivia. Every figure is
+fetched from a provider, computed from fetched data, or shown as missing.
+
 > **This application is for educational purposes only and does not constitute
 > personalized financial or investment advice.**
 
@@ -16,107 +20,67 @@ npm install
 npm run dev
 ```
 
-Open <http://localhost:3200>. The app works immediately with no API key —
-complete sample dossiers are bundled for **AAPL**, **MSFT** and **TSLA**.
+Open <http://localhost:3200>, click **API keys**, and paste a free Finnhub key.
+That is enough for everything except the price chart; a free Twelve Data key
+fills that. Keys stay in the browser and never reach the repository.
 
 ```bash
-npm run lint      # oxlint
-npm run build     # tsc -b && vite build
-npm run preview   # serve the production build
+npm run lint              # oxlint
+npm run test              # vitest — 41 tests over the pure modules
+npm run build             # tsc -b && vite build
+npm run backtest:fetch    # pull the backtest inputs (needs FINNHUB_KEY, TWELVEDATA_KEY)
+npm run backtest:compute  # score the anchor date and write src/data/backtest.json
 ```
 
 ## What is on the page
 
-| Section | What it answers |
-|---|---|
-| Company snapshot | What does this company do, and what is the stock doing today |
-| Executive verdict | Our own 0–100 score, expandable down to individual metrics |
-| Price performance | Candles, volume, MACD and RSI with range controls, a draggable brush and a benchmark overlay |
-| Business fundamentals | Is the business improving — trends, not a single latest number |
-| Valuation | Multiples against the sector median, with "not meaningful" where it applies |
-| Competitor comparison | How it stacks against a curated peer set |
-| Industry comparison | 1-year performance against the industry, plus the top 3 alternatives ranked on fundamentals |
-| Analyst consensus | What the sell side publishes, kept strictly separate from our model |
-| News and catalysts | Sourced headlines, model-scored sentiment, upcoming events |
-| Earnings call sentiment | Tone of the last four calls, management against analysts, from real transcripts |
-| Fun facts | Trivia and arithmetic curiosities. Entertainment, clearly labelled |
-| Investment thesis builder | An editable bull/base/bear draft you can copy out |
-| Watchlist | Browser-local, no account needed |
+| Section | What it answers | Source |
+|---|---|---|
+| Company snapshot | What the company is and what the stock did today | Finnhub |
+| Executive verdict | Our own 0–100 score, expandable to every metric and band | computed |
+| Track record | Would that score have said anything a year ago? | committed backtest |
+| Price performance | Candles, volume, MACD, RSI; draggable brush; benchmark overlay | Twelve Data |
+| Business fundamentals | Trends over six fiscal years | Finnhub series |
+| Valuation | Multiples against the median of the real peer set | Finnhub |
+| Competitor comparison | Finnhub's own peer list, each with live metrics | Finnhub |
+| Peer performance and alternatives | 1-year return against peers; top 3 peers on fundamentals | Finnhub |
+| Analyst consensus | Rating distribution month by month; price target if a key allows | Finnhub, Alpha Vantage |
+| News and catalysts | Recent coverage, next reporting date with estimates | Finnhub |
+| Earnings call sentiment | Tone of the last four calls; management vs analysts; tone vs price reaction | course archive, Twelve Data |
+| Fun facts | Arithmetic curiosities from the loaded data | computed |
+| Investment thesis builder | Editable bull/base/bear; a model can write it from the whole dossier | template or OpenRouter |
+| Watchlist | Remembers the score when added and shows what moved since | browser |
 
 ## Data providers
 
-**Finnhub** is the primary provider, with **Twelve Data** for price history and
-**Alpha Vantage** for one thing neither of them gives away. All three send CORS
-headers, so a static build needs no proxy. Every tier below was verified against
-a real key, not read off a pricing page.
+Every tier below was verified against a real key, not read off a pricing page.
 
-| | Finnhub free | Alpha Vantage free | Twelve Data free |
+| | Finnhub free | Twelve Data free | Alpha Vantage free |
 |---|---|---|---|
-| Budget | **60 / minute** | 25 / **day** | 800 / day |
-| Profile, logo | ✓ | ✓ (no logo) | — |
-| Ratios | ✓ 133 metrics | ✓ | — |
-| Fundamentals history | ✓ 39 annual + 41 quarterly series | ✓ statements | — |
+| Budget | **60 / minute** | 8 / minute, 800 / day | 25 / **day** |
+| Profile, logo | ✓ | — | ✓ (no logo) |
+| Ratios | ✓ 133 metrics | — | ✓ |
+| Fundamentals history | ✓ 39 annual + 41 quarterly series | — | ✓ statements |
 | Peers | ✓ real list | — | — |
-| Analyst distribution | ✓ **month by month** | ✓ current snapshot only | — |
-| Consensus price target | premium | ✓ | — |
-| Upgrades / downgrades | premium | — | — |
-| Price history | premium | 100 bars (`full` is premium) | ✓ multi-year |
+| Analyst distribution | ✓ **month by month** | — | current snapshot only |
+| Consensus price target | premium | — | ✓ |
+| Company news | ✓ | — | ✓ |
+| Earnings calendar | ✓ with estimates | — | — |
+| Price history | premium | ✓ multi-year | 100 bars |
 
-The budget line is what decides it: 60 requests a minute against 25 a day is the
-difference between fetching metrics for every peer and rationing calls. Finnhub
-is therefore the base, Twelve Data fills the chart, and Alpha Vantage is used for
-exactly one request — the price target that Finnhub charges for.
+**Finnhub** is the base. Sixty requests a minute is what allows fetching metrics
+for every peer instead of rationing calls. **Twelve Data** fills the chart and
+the benchmark. **Alpha Vantage** is used for exactly one request per company —
+the consensus price target Finnhub charges for — and as a last resort for prices.
 
 Finnhub publishes per-share figures and margins rather than absolute statement
 lines, so the fundamentals charts reconstruct revenue and profit from them and
 the share count. Derived, not reported, and labelled as such in the app.
 
-Free-tier limits worth knowing:
-
-- Data is **end-of-day**. Intraday US market data is premium-only under exchange
-  rules.
-- `outputsize=full` on `TIME_SERIES_DAILY` is **also premium**, so a free key
-  gets `compact` — the most recent 100 sessions, roughly five months. That is
-  not enough for a 200-day average or a one-year return, so both report as
-  unavailable rather than being computed over a shorter window and mislabelled.
-  **Add a Twelve Data key for multi-year history**; it takes over both the price
-  series and the benchmark, and the one-year return and 200-day average are then
-  computed from that longer series. The superseded warning is retracted rather
-  than left contradicting the newer note.
-- The free key also refuses **bursts**: no more than one request per second.
-  Every call goes through a queue that serialises and spaces them, because
-  firing a dossier's requests in parallel trips the limiter well before the
-  daily quota does.
-- A dossier costs up to eight requests against a budget of 25, so: responses are
-  cached for six hours **and persisted across reloads** (a refresh would
-  otherwise silently re-spend the budget), identical in-flight requests are
-  de-duplicated, and any call another configured key already covers is not made
-  at all. A Twelve Data key removes two requests, a newsdata.io key one.
-- Optional providers are fetched **before** the base provider, so skipping an
-  Alpha Vantage request is only decided once its replacement has actually
-  succeeded. Deciding to skip up front would leave the page with neither.
-
-### Entering keys
-
-Click **API keys** in the header. Keys are stored in this browser only, are sent
-nowhere except the provider they belong to, and are never written to the
-repository — which is what keeps the deployed page safe to share publicly.
-
-| Key | Env name | What it unlocks | Required |
-|---|---|---|---|
-| Alpha Vantage | `ALPHAVANTAGE_API_KEY` | Profile, fundamentals, valuation, analyst consensus | Recommended — without it everything is sample data |
-| Twelve Data | `TWELVE_DATA_API` | Daily price history for the chart, at a higher daily allowance | Optional |
-| newsdata.io | `NEWS_DATA_IO_API_KEY` | Live headlines in the news section | Optional |
-| OpenRouter | `OPENROUTER_API_KEY` | Narrative summary of the investment thesis | Optional |
-
-A dossier is assembled in layers: the base record comes from Alpha Vantage (or
-the bundled sample data), then each additional key replaces the slice it is
-better at. A layer that fails is reported as a note under the header rather than
-thrown, so a bad newsdata.io key costs you the news section and nothing else.
-
-For local development the same keys can be set as `VITE_`-prefixed variables in
-`.env.local`; see `.env.example`. Note that those are compiled into the bundle
-and are therefore public, so the panel is the better route.
+Optional providers are fetched **before** the base provider, and any base
+request they cover is skipped only once they have actually succeeded. A failing
+key costs its own section and nothing else; every layer reports what it did in
+a note under the header.
 
 ### Earnings call transcripts
 
@@ -126,56 +90,44 @@ therefore runs on the archive published for the course:
 <https://github.com/kwartler/vienna-genai-finance-course/tree/main/earnings_call_archive/transcripts_sp500_marketbeat>
 
 2,899 transcripts across 383 S&P 500 companies, served from
-raw.githubusercontent.com with `Access-Control-Allow-Origin: *`. No key, no
-proxy. The four most recent quarters per ticker are indexed in
-`src/data/earningsArchive.ts`.
+raw.githubusercontent.com with `Access-Control-Allow-Origin: *`. No key. The
+four most recent quarters per ticker are indexed in `src/data/earningsArchive.ts`.
 
-### Providers evaluated and rejected
+### Entering keys
 
-| Provider | Why not |
-|---|---|
-| Financial Modeling Prep | Analyst estimates, grades and peers sit behind paid tiers; the free plan is 250 requests/day |
-| Finnhub | `/stock/candle`, price targets, upgrades/downgrades and news sentiment are all premium. `/stock/peers` and `/stock/recommendation` are free and would be worth adding — see next improvements |
-| SEC EDGAR (`data.sec.gov`) | Free, official, complete history, no key — but sends no CORS header, so a static page cannot call it, and it carries no analyst data. Worth adding behind the proxy later |
-| Stooq | Now behind a JavaScript bot challenge, unusable from a browser app |
+Click **API keys** in the header. Keys are stored in this browser only, are sent
+nowhere except the provider they belong to, and are never written to the
+repository. Because this is a static app with no backend, a key travels from the
+browser straight to the provider over HTTPS — fine for a classroom, but anything
+shared should put a serverless proxy in front (see below).
 
-### Keeping the key off the client
+| Key | Env name | What it unlocks | Required |
+|---|---|---|---|
+| Finnhub | `FINNHUB_API_KEY` | Everything except the price chart | **Yes** |
+| Twelve Data | `TWELVE_DATA_API` | Multi-year price history and the benchmark | For the chart |
+| Alpha Vantage | `ALPHAVANTAGE_API_KEY` | Consensus price target; 100-bar prices as a fallback | Optional |
+| newsdata.io | `NEWS_DATA_IO_API_KEY` | Alternative headline source | Optional |
+| OpenRouter | `OPENROUTER_API_KEY` | Model-written thesis from the whole dossier | Optional |
 
-Anything prefixed `VITE_` is inlined into the JavaScript bundle at build time
-and is therefore **public**. That is acceptable only for a throwaway local demo
-key.
+Anything prefixed `VITE_` in `.env.local` is compiled into the bundle and is
+therefore public; the panel is the better route.
 
-For any shared deployment, put a serverless function in front of the provider
-and point `VITE_API_PROXY_URL` at it:
+### Keeping keys off the client
+
+For any shared deployment, put a serverless function in front of the providers:
 
 ```js
-// api/quote.js — Vercel / Netlify function
+// api/finnhub.js — Vercel / Netlify function
 export default async function handler(req, res) {
   const params = new URLSearchParams(req.query);
-  params.set('apikey', process.env.ALPHAVANTAGE_KEY); // server-side only
-  const upstream = await fetch(`https://www.alphavantage.co/query?${params}`);
+  params.set('token', process.env.FINNHUB_KEY); // server-side only
+  const upstream = await fetch(`https://finnhub.io/api/v1/${req.query.path}?${params}`);
   res.setHeader('Cache-Control', 's-maxage=600');
   res.status(upstream.status).json(await upstream.json());
 }
 ```
 
-The function holds the real key as a server environment variable, so it never
-reaches the browser. Restrict it to an allowlist of `function` values so it
-cannot be used as an open proxy.
-
-### The price chart
-
-Presets (1M–ALL), explicit from/to dates, and a brush under the axis that can be
-dragged to pan and grabbed by either edge to zoom. All four panels share one
-x-scale, so they redraw together. The brush is focusable: arrow keys pan, shift
-and arrow keys resize.
-
-Pointer positions are mapped through the SVG's screen matrix rather than
-`getBoundingClientRect`, because the viewBox is clamped to a minimum width — on
-a narrow container the SVG is scaled and one CSS pixel is not one viewBox unit.
-
-Indicators are computed over the full series and then sliced, so values do not
-change as you zoom.
+Restrict `path` to an allowlist so the function cannot be used as an open proxy.
 
 ## Scoring methodology
 
@@ -183,147 +135,90 @@ The Executive verdict score runs from 0 to 100 and combines five categories:
 
 | Category | Weight | Metrics |
 |---|---|---|
-| Growth | 25% | Revenue growth YoY, 3-year revenue CAGR, earnings growth YoY |
-| Profitability | 25% | Operating margin, net margin, return on equity, return on invested capital |
-| Valuation vs peers | 20% | P/E and EV/EBITDA relative to the sector median, free cash flow yield, PEG |
+| Growth | 25% | Revenue growth YoY, 3-year revenue CAGR, EPS growth YoY |
+| Profitability | 25% | Operating margin, net margin, ROE, ROIC |
+| Valuation vs peers | 20% | P/E and EV/EBITDA relative to the **peer median**, FCF yield, PEG |
 | Financial health | 15% | Debt to equity, interest coverage, current ratio |
-| Price momentum | 15% | 1-year return, position in the 52-week range, price vs the 200-day average |
+| Price momentum | 15% | 1-year return, position in the 52-week range, price vs 200-day average |
 
-Each metric is scored 0–100 on a linear band with two stated anchors — for
-example revenue growth scores 0 at −5% and 100 at +25%. A category is the mean
-of its available metrics; the categories are then combined by weight. **A
-category with no data is dropped and its weight is redistributed**, rather than
-counted as zero, which would penalise a company for a provider's gaps.
+Each metric is scored 0–100 on a linear band with two stated anchors. A category
+is the mean of its available metrics; the categories are combined by weight.
+**A category with no data is dropped and its weight redistributed**, never
+counted as zero. The peer median is the median of the Finnhub peer set's own
+metrics, computed on the page.
 
-Classification: **Bullish** at 65+, **Watch** from 40 to 64, **Bearish** below
-40. Confidence reflects how many of the model's metrics had usable data.
+Classification: **Bullish** at 65+, **Watch** from 40 to 64, **Bearish** below 40.
 
-Every band is shown in the UI under "Show how this score is built". They are
-chosen for teaching, not calibrated against realised returns.
+**Analyst opinion carries zero weight**, and a test enforces it. If analyst
+ratings fed the score, comparing the score against those ratings would only
+rediscover the same opinion. Keeping them apart is what makes the "contrarian
+signal" callout meaningful.
+
+### Track record
+
+`npm run backtest:fetch` pulls, for all 383 archive companies, the Finnhub
+annual series and profile plus Twelve Data prices from late 2023 to early 2026.
+`npm run backtest:compute` then scores every company **as of 31 January 2025**
+using only fiscal periods ending on or before that date, with valuation
+multiples recomputed from the anchor-day close, peer medians per Finnhub
+industry (universe median where an industry has fewer than four members), and
+momentum from bars up to the anchor. The forward return is the following 252
+trading days, measured as excess over SPY.
+
+The result is committed as `src/data/backtest.json` and rendered in the Track
+record section. The headline sentence there is chosen by the numbers — a null
+or inverse result reads as exactly that. Growth is measured on per-share
+revenue, which buybacks flatter; interest coverage and PEG are not available
+historically and are absent.
 
 ## Earnings call sentiment
 
-Scored with a finance-specific word list rather than a general one. This is the
-Loughran-McDonald observation: ordinary sentiment lexicons treat "liability",
-"cost", "capital" and "depreciation" as negative, so scoring an earnings call
-with one mostly measures how much accounting was discussed.
+Scored with a finance-specific word list rather than a general one. Ordinary
+sentiment lexicons treat "liability", "cost" and "depreciation" as negative, so
+scoring an earnings call with one mostly measures how much accounting was
+discussed. Three dimensions: polarity, **hedging** and **legal vocabulary**.
 
-Three dimensions are tracked: polarity, **hedging** (a confident quarter and a
-hedged one can have identical positive/negative counts) and **legal vocabulary**
-(which tends to rise before trouble becomes a headline).
+Management and analysts are scored separately — management always scores
+higher, so the signal is the gap and its movement. Speakers are separated by
+employer, not job title (a sell-side "Head of Research" fools a title matcher).
+Boilerplate is excluded and a highlighted passage needs several tone words.
 
-Management and analysts are scored separately, because management normally
-scores higher on any call — they are presenting, the analysts are probing. The
-signal is the gap and how it moves quarter to quarter, not either number alone.
-Speakers are separated by employer, not job title, for the reason described in
-`earningsCalls.ts`.
+The section also puts each call's tone change next to the share price move over
+the following five sessions. Four calls are far too few to conclude anything;
+the point is to see the two side by side.
 
-Boilerplate is excluded: every call opens with the same welcome and safe-harbour
-language, and left in it wins "most positive passage" on almost every
-transcript. A highlighted passage also has to contain several tone words, so a
-single word cannot drive a passage to ±1.0.
-
-This is a word-count model. It cannot read sarcasm, negation or context, and the
-UI says so.
-
-### Where the analyst data comes from
-
-Worth being precise about, because it differs by mode:
-
-- **With an Alpha Vantage key:** the rating distribution comes from the
-  `OVERVIEW` endpoint's `AnalystRatingStrongBuy` / `Buy` / `Hold` / `Sell` /
-  `StrongSell` fields, and the target from `AnalystTargetPrice`. Alpha Vantage
-  does not document which vendor it aggregates. The free tier publishes only a
-  current snapshot — **no rating history and no individual upgrades or
-  downgrades** — so those panels show an explicit "not available" rather than a
-  reconstruction.
-- **Without a key (sample data):** the distributions, targets, estimates and
-  firm-by-firm actions in `src/data/mockSeeds.ts` are **written by hand for this
-  project**. They are plausible, not real analyst coverage, and everything on
-  the page is labelled "Sample data" while they are in use.
-
-**Analyst opinion carries zero weight.** This is deliberate. If analyst ratings
-fed the score, the app would then compare the score against those same ratings
-and find agreement it had manufactured itself. Keeping them separate is what
-makes the "contrarian signal" callout meaningful.
+This is a word-count model. It cannot read sarcasm, negation or context.
 
 ## Architecture
 
 ```
 src/
-  types/          One place defining every data model the UI consumes
+  types/           Every data model the UI consumes
   services/
-    index.ts      Facade: caching, in-flight de-duplication, provider selection
-    providers/
-      mock.ts     Bundled sample data, deterministic price generation
-      alphaVantage.ts
-  data/           Sample seeds, peer map, sector medians, curated trivia
-  lib/            Scoring, indicators, fun facts, thesis drafting, formatting
-  hooks/          Watchlist (localStorage)
-  components/     One file per dashboard section, plus ui/ primitives
+    index.ts       Facade: layered assembly, persisted cache, de-duplication
+    keys.ts        Runtime key store (browser only)
+    providers/     finnhub, twelveData, alphaVantage, newsData, openRouter, earningsCalls
+  data/            earningsArchive.ts (index), backtest.json (results)
+  lib/             scoring, sentiment, indicators, industry, funFacts, thesis, backtestStats
+  hooks/           useWatchlist, useEarningsSentiment
+  components/      One file per section, plus ui/ primitives
+scripts/backtest.ts
 ```
 
-Components call `loadDossier(symbol)` and never touch a provider directly, so
-adding a provider means writing one adapter that returns a `CompanyDossier`.
+## Assumptions and limits
 
-Handled explicitly: loading skeletons, empty states, provider errors, rate
-limits, missing metrics, stale data warnings and unsupported tickers. When a
-live provider is configured but rate-limited or unreachable, the app falls back
-to sample data **only** where a sample exists, and the UI still says the data is
-sample data.
+- **Fundamentals are reconstructed** from per-share figures and margins.
+- **Peer medians use up to eight Finnhub peers**; the set is Finnhub's, not ours.
+- **Finnhub has no business description** on the free plan; the snapshot says so.
+- **Individual analyst upgrades/downgrades and target ranges are premium
+  everywhere** tested; those panels report themselves unavailable.
+- **The watchlist and keys are per browser.**
+- **One backtest anchor is one draw.** A different year could read differently.
 
-## Assumptions
+## Next improvements
 
-- **Peer sets are curated, not discovered.** No free provider exposes a peer
-  endpoint, and fetching metrics per peer would cost one request each. See
-  `src/data/peerMap.ts`.
-- **Sector medians are static reference figures**, not live calculations.
-- **Sample financial figures are order-of-magnitude realistic, not filings.**
-  They exist so the app is explorable without a key, and are labelled as sample
-  data everywhere they appear.
-- **Sample price history is generated** from a seeded PRNG anchored to the real
-  latest close, so charts are stable across reloads but are not real prices.
-- **Return on invested capital and current ratio are unavailable from the live
-  provider** and show as "n/a" there; both are present in the sample data.
-- **The watchlist and the API keys are per browser.** Clearing site data removes
-  both.
-- **The industry comparison universe is curated** (`src/data/universe.ts`) for
-  the same reason as the peer set. Alternatives are ranked on a reduced metric
-  set — growth, profitability and valuation against the sector median — because
-  that is all a comparison universe realistically carries.
-- **newsdata.io sentiment is keyword-classified in this app**, because the
-  provider only supplies a sentiment field on paid plans. The UI labels it as
-  model-scored rather than reported.
-
-## Recommended next improvements
-
-1. Add the serverless proxy so the key is server-side and SEC EDGAR becomes
-   usable — that would give real, complete, free fundamentals with full history.
-2. Fetch peer metrics through the proxy, which removes the request-budget limit
-   and makes the competitor table live.
-3. Persist the edited thesis alongside the watchlist entry, so a company's
-   research survives a reload.
-4. Add a quarterly view to the fundamentals section; annual periods hide
-   inflections.
-5. Unit-test the scoring bands and the ratio derivations — they are the part
-   most likely to break silently when a provider changes a field name.
-6. Replace the static sector medians with a computed median over the peer set
-   once peer metrics are live.
-7. Add Finnhub for the two things its free tier does well and Alpha Vantage
-   cannot: `/stock/peers` would replace the curated peer list with a real one,
-   and `/stock/recommendation` returns the analyst rating distribution **over
-   time**, which would fill the recommendation-trend panel that currently
-   reports itself as unavailable. Both send CORS headers. Its transcripts,
-   candles, price targets and sentiment endpoints are premium.
-
-## Compliance and transparency
-
-- The educational-use disclaimer is visible in the header and the footer.
-- The data provider, freshness (`live` / `delayed` / `end-of-day`) and the exact
-  update time are shown in the snapshot and the footer.
-- Sections produced by this application rather than reported by a source are
-  marked **Generated** or **Model output**.
-- Analyst price targets are described as opinions, never as predictions or
-  guaranteed outcomes.
-- Thin or stale analyst coverage triggers an explicit warning.
-- Metrics that cannot be computed read "not meaningful" rather than showing zero.
+1. The serverless proxy above, which also unlocks SEC EDGAR (free, no CORS).
+2. A second and third backtest anchor, so the track record is not one year.
+3. Persist the edited thesis with the watchlist entry.
+4. A quarterly view in the fundamentals section.
+5. Mobile layout for the four-panel chart.

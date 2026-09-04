@@ -106,7 +106,7 @@ export function Header({
               {symbol}
             </button>
           ))}
-          <span className="text-slate-400">— full sample data is bundled for these three</span>
+
         </div>
       </div>
     </header>

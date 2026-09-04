@@ -106,7 +106,7 @@ function detectCompanyEmployer(rows: Array<{ title: string }>): string | null {
   return best;
 }
 
-function parseTranscript(csv: string): TranscriptLine[] {
+export function parseTranscript(csv: string): TranscriptLine[] {
   const rows = parseCsv(csv);
   if (rows.length < 2) return [];
 

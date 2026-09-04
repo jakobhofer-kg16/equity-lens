@@ -3,10 +3,12 @@ import { KeyRound, Star, StarOff } from 'lucide-react';
 import { DataError, type CompanyDossier } from './types';
 import { invalidateCache, loadDossier, providerStatus } from './services';
 import { scoreCompany } from './lib/scoring';
-import { useWatchlist } from './hooks/useWatchlist';
+import { useWatchlist, type WatchlistSnapshot } from './hooks/useWatchlist';
+import { useEarningsSentiment } from './hooks/useEarningsSentiment';
 import { Header } from './components/Header';
 import { CompanySnapshot } from './components/CompanySnapshot';
 import { ExecutiveVerdict } from './components/ExecutiveVerdict';
+import { TrackRecord } from './components/TrackRecord';
 import { PricePerformance } from './components/PricePerformance';
 import { Fundamentals } from './components/Fundamentals';
 import { Valuation } from './components/Valuation';
@@ -64,6 +66,7 @@ export default function App() {
   const [status, setStatus] = useState(providerStatus);
 
   const watchlist = useWatchlist();
+  const sentiment = useEarningsSentiment(symbol);
 
   const fetchSymbol = useCallback(async (next: string) => {
     setLoading(true);
@@ -82,17 +85,30 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    void fetchSymbol(INITIAL_SYMBOL);
+    if (providerStatus().ready) void fetchSymbol(INITIAL_SYMBOL);
+    else setLoading(false);
   }, [fetchSymbol]);
 
   const score = useMemo(() => (dossier ? scoreCompany(dossier) : null), [dossier]);
 
-  const impliedUpside =
-    dossier?.priceTargets?.median && dossier.quote.price
-      ? dossier.priceTargets.median / dossier.quote.price - 1
-      : null;
 
   const inWatchlist = watchlist.has(symbol);
+
+  function snapshotOf(d: CompanyDossier): WatchlistSnapshot {
+    const s = scoreCompany(d);
+    return {
+      price: d.quote.price,
+      changePercent: d.quote.changePercent,
+      modelScore: s.total,
+      classification: s.classification,
+      categories: Object.fromEntries(s.categories.map((c) => [c.key, c.score])),
+      consensusLabel: d.consensus?.consensusLabel ?? null,
+      consensusScore: d.consensus?.consensusScore ?? null,
+      impliedUpside: d.priceTargets?.median && d.quote.price ? d.priceTargets.median / d.quote.price - 1 : null,
+      nextEarningsDate: d.earnings.nextEarningsDate,
+      takenAt: new Date().toISOString()
+    };
+  }
 
   function toggleWatchlist() {
     if (!dossier || !score) return;
@@ -100,18 +116,18 @@ export default function App() {
       watchlist.remove(dossier.profile.symbol);
       return;
     }
-    watchlist.add({
-      symbol: dossier.profile.symbol,
-      name: dossier.profile.name,
-      price: dossier.quote.price,
-      changePercent: dossier.quote.changePercent,
-      modelScore: score.total,
-      classification: score.classification,
-      consensusLabel: dossier.consensus?.consensusLabel ?? null,
-      impliedUpside,
-      nextEarningsDate: dossier.earnings.nextEarningsDate,
-      addedAt: new Date().toISOString()
-    });
+    watchlist.add(dossier.profile.symbol, dossier.profile.name, snapshotOf(dossier));
+  }
+
+  async function refreshWatched(next: string): Promise<WatchlistSnapshot | null> {
+    try {
+      const fresh = await loadDossier(next);
+      const snap = snapshotOf(fresh);
+      watchlist.refresh(next, snap);
+      return snap;
+    } catch {
+      return null;
+    }
   }
 
   return (
@@ -126,20 +142,22 @@ export default function App() {
       />
 
       <main className="mx-auto max-w-6xl space-y-8 px-4 py-6">
-        {status.isMock ? (
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            <span>
-            Running on bundled sample data because no API key is configured. Full sample dossiers exist for{' '}
-            <strong>{status.sampleSymbols.join(', ')}</strong>. Add an Alpha Vantage key to analyze any US ticker.
-            </span>
+        {!status.ready ? (
+          <Card className="p-6">
+            <h2 className="text-base font-semibold text-slate-900">Connect a data provider to begin</h2>
+            <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-slate-600">
+              This dashboard shows only data it has actually fetched — there is no bundled sample company. A free
+              Finnhub key is enough for everything except the price chart; add a free Twelve Data key for that. Keys
+              stay in this browser and are never written to the repository.
+            </p>
             <button
               type="button"
               onClick={() => setKeysOpen(true)}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-amber-400 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100"
+              className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
             >
-              <KeyRound className="h-3.5 w-3.5" aria-hidden /> Add API keys
+              <KeyRound className="h-4 w-4" aria-hidden /> Add API keys
             </button>
-          </div>
+          </Card>
         ) : null}
 
         {dossier?.source.notes.length ? (
@@ -152,7 +170,7 @@ export default function App() {
 
         {loading ? <DashboardSkeleton /> : null}
 
-        {!loading && error ? (
+        {!loading && error && status.ready ? (
           <ErrorState title={error.title} detail={error.detail} onRetry={() => void fetchSymbol(symbol)} />
         ) : null}
 
@@ -171,6 +189,7 @@ export default function App() {
 
             <CompanySnapshot dossier={dossier} />
             <ExecutiveVerdict score={score} symbol={dossier.profile.symbol} />
+            <TrackRecord />
             <PricePerformance dossier={dossier} />
             <Fundamentals dossier={dossier} />
             <Valuation dossier={dossier} />
@@ -178,9 +197,16 @@ export default function App() {
             <IndustryComparison dossier={dossier} />
             <AnalystConsensus dossier={dossier} score={score} />
             <NewsCatalysts dossier={dossier} />
-            <EarningsSentiment symbol={dossier.profile.symbol} />
+            <EarningsSentiment
+              symbol={dossier.profile.symbol}
+              result={sentiment.result}
+              loading={sentiment.loading}
+              error={sentiment.error}
+              available={sentiment.available}
+              bars={dossier.prices.bars}
+            />
             <FunFacts dossier={dossier} />
-            <ThesisBuilder dossier={dossier} score={score} />
+            <ThesisBuilder dossier={dossier} score={score} sentiment={sentiment.result} />
           </>
         ) : null}
       </main>
@@ -219,6 +245,7 @@ export default function App() {
         onClose={() => setWatchlistOpen(false)}
         onSelect={(next) => void fetchSymbol(next)}
         onRemove={watchlist.remove}
+        onRefresh={refreshWatched}
       />
     </div>
   );

@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Check, Copy, RotateCcw } from 'lucide-react';
+import { Check, Copy, RotateCcw, Sparkles } from 'lucide-react';
 import type { CompanyDossier } from '../types';
 import type { ModelScore } from '../lib/scoring';
 import { buildThesisDraft, thesisToText, type Horizon, type RiskTolerance, type ThesisDraft } from '../lib/thesis';
-import { Card, GeneratedBadge, Section } from './ui/primitives';
+import { getKeys } from '../services/keys';
+import { THESIS_MODEL, writeThesisWithAi } from '../services/providers/openRouter';
+import type { EarningsSentimentResult } from '../services/providers/earningsCalls';
+import { Card, GeneratedBadge, Pill, Section } from './ui/primitives';
 
 const FIELDS: Array<{ key: keyof ThesisDraft; label: string; rows: number }> = [
   { key: 'bull', label: 'Bull case', rows: 4 },
@@ -18,10 +21,21 @@ const FIELDS: Array<{ key: keyof ThesisDraft; label: string; rows: number }> = [
 const HORIZONS: Horizon[] = ['6 months', '1-2 years', '3-5 years'];
 const RISK_LEVELS: RiskTolerance[] = ['conservative', 'balanced', 'aggressive'];
 
-export function ThesisBuilder({ dossier, score }: { dossier: CompanyDossier; score: ModelScore }) {
+export function ThesisBuilder({
+  dossier,
+  score,
+  sentiment
+}: {
+  dossier: CompanyDossier;
+  score: ModelScore;
+  sentiment: EarningsSentimentResult | null;
+}) {
   const [horizon, setHorizon] = useState<Horizon>('1-2 years');
   const [risk, setRisk] = useState<RiskTolerance>('balanced');
   const [copied, setCopied] = useState(false);
+  const [aiState, setAiState] = useState<'idle' | 'writing' | 'done' | 'error'>('idle');
+  const [aiError, setAiError] = useState<string | null>(null);
+  const hasAiKey = Boolean(getKeys().openRouter);
 
   const generated = useMemo(
     () => buildThesisDraft(dossier, score, horizon, risk),
@@ -31,7 +45,24 @@ export function ThesisBuilder({ dossier, score }: { dossier: CompanyDossier; sco
 
   // Regenerating on ticker or setting changes replaces the draft, which also
   // discards edits — the reset button makes that explicit rather than surprising.
-  useEffect(() => setDraft(generated), [generated]);
+  useEffect(() => {
+    setDraft(generated);
+    setAiState('idle');
+  }, [generated]);
+
+  async function writeWithAi() {
+    const key = getKeys().openRouter;
+    if (!key) return;
+    setAiState('writing');
+    setAiError(null);
+    try {
+      setDraft(await writeThesisWithAi(key, dossier, score, sentiment, horizon, risk));
+      setAiState('done');
+    } catch (err) {
+      setAiError((err as Error).message);
+      setAiState('error');
+    }
+  }
 
   async function copy() {
     const text = thesisToText(dossier.profile.symbol, dossier.profile.name, draft, horizon, risk);
@@ -56,8 +87,12 @@ export function ThesisBuilder({ dossier, score }: { dossier: CompanyDossier; sco
     <Section
       id="thesis"
       title="Investment thesis builder"
-      subtitle="A starting draft assembled from the figures on this page. Every field is editable — the point is that you rewrite it."
-      action={<GeneratedBadge label="Generated draft" />}
+      subtitle={
+        hasAiKey
+          ? 'Template draft from the figures on this page, or let the model write one from the whole dossier. Every field stays editable.'
+          : 'Template draft assembled from the figures on this page. Add an OpenRouter key to have a model write it from the whole dossier. Every field stays editable.'
+      }
+      action={aiState === 'done' ? <GeneratedBadge label={`AI-generated · ${THESIS_MODEL}`} /> : <GeneratedBadge label="Template draft" />}
     >
       <Card className="p-5">
         <div className="flex flex-wrap items-end gap-5">
@@ -95,10 +130,24 @@ export function ThesisBuilder({ dossier, score }: { dossier: CompanyDossier; sco
             </div>
           </fieldset>
 
-          <div className="ml-auto flex gap-2">
+          <div className="ml-auto flex flex-wrap gap-2">
+            {hasAiKey ? (
+              <button
+                type="button"
+                onClick={writeWithAi}
+                disabled={aiState === 'writing'}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-amber-400 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900 transition hover:bg-amber-100 disabled:opacity-60"
+              >
+                <Sparkles className="h-3.5 w-3.5" aria-hidden />
+                {aiState === 'writing' ? 'Writing…' : 'Write with AI'}
+              </button>
+            ) : null}
             <button
               type="button"
-              onClick={() => setDraft(generated)}
+              onClick={() => {
+                setDraft(generated);
+                setAiState('idle');
+              }}
               className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
             >
               <RotateCcw className="h-3.5 w-3.5" aria-hidden /> Reset to draft
@@ -113,6 +162,16 @@ export function ThesisBuilder({ dossier, score }: { dossier: CompanyDossier; sco
             </button>
           </div>
         </div>
+
+        {aiState === 'error' && aiError ? (
+          <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">AI draft failed: {aiError}</p>
+        ) : null}
+        {aiState === 'done' ? (
+          <p className="mt-3 text-xs text-slate-500">
+            <Pill tone="amber">AI-generated</Pill> Written by {THESIS_MODEL} from the data on this page only. Check every
+            number against the sections above before you use it.
+          </p>
+        ) : null}
 
         <div className="mt-5 grid gap-4 md:grid-cols-2">
           {FIELDS.map((field) => (

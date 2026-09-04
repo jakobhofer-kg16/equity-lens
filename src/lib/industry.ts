@@ -1,30 +1,17 @@
 /**
- * Industry comparison and alternative ranking.
+ * Industry comparison and alternative ranking, on the real peer set.
  *
- * Two separate questions are answered here, and they are deliberately kept
- * apart: how the selected stock has *performed* against its industry, and which
- * names in that industry look better on *fundamentals*. A stock can lag its
- * industry badly and still be the strongest business in it.
+ * Two separate questions, kept apart: how the selected stock has *performed*
+ * against its peers, and which peers look better on *fundamentals*. A laggard
+ * can still be the strongest business in the group.
  *
- * The ranking uses the same philosophy as the main score — growth,
- * profitability and valuation against the sector median — but a reduced metric
- * set, because that is all a comparison universe realistically carries. It is
- * scored separately rather than reusing scoreCompany(), which needs a full
- * dossier per company.
+ * The ranking uses the same emphasis as the main score — growth, profitability
+ * and valuation against the peer median — on the reduced metric set a peer
+ * record carries.
  */
 
 import type { CompanyDossier, PeerCompany } from '../types';
-import { UNIVERSE, universeFor, type UniverseEntry } from '../data/universe';
-import { computeMomentumInput } from './scoring';
-
-const UNIVERSE_BY_SYMBOL = new Map(UNIVERSE.map((entry) => [entry.symbol, entry]));
-
-function median(values: number[]): number | null {
-  const sorted = values.filter(Number.isFinite).sort((a, b) => a - b);
-  if (!sorted.length) return null;
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
-}
+import { median } from '../services/providers/finnhub';
 
 function scale(value: number, atZero: number, atHundred: number): number {
   return Math.max(0, Math.min(100, ((value - atZero) / (atHundred - atZero)) * 100));
@@ -32,38 +19,43 @@ function scale(value: number, atZero: number, atHundred: number): number {
 
 export interface IndustryPerformance {
   sector: string | null;
-  industry: string | null;
   stockReturn: number | null;
-  industryMedianReturn: number | null;
-  /** Stock return minus industry median. Positive means outperformance. */
+  peerMedianReturn: number | null;
+  /** Stock return minus peer median. Positive means outperformance. */
   spread: number | null;
   constituents: Array<{ symbol: string; name: string; oneYearReturn: number | null }>;
 }
 
+/**
+ * The company's own return comes from the same Finnhub field as the peers'
+ * (52-week price return), so the comparison uses one definition. The price
+ * series is only the fallback.
+ */
+function ownReturn(dossier: CompanyDossier): number | null {
+  const fromProvider = dossier.peers.self?.oneYearReturn ?? null;
+  if (fromProvider !== null) return fromProvider;
+  const bars = dossier.prices.bars;
+  if (bars.length < 240) return null;
+  const last = bars[bars.length - 1].close;
+  const yearAgo = bars[Math.max(0, bars.length - 253)].close;
+  return yearAgo > 0 ? last / yearAgo - 1 : null;
+}
+
 export function industryPerformance(dossier: CompanyDossier): IndustryPerformance {
-  const { profile } = dossier;
-  const peers = universeFor(profile.sector, profile.symbol);
-
-  // Peer returns come from the curated universe. Taking the selected company's
-  // return from its price series instead would compare two different sources
-  // and produce a spread that is an artefact of the mismatch, so the universe
-  // figure wins when there is one and the series is only the fallback.
-  const own = UNIVERSE_BY_SYMBOL.get(profile.symbol.toUpperCase());
-  const stockReturn = own?.oneYearReturn ?? computeMomentumInput(dossier).oneYearReturn;
-
-  const returns = peers.map((p) => p.oneYearReturn).filter((v): v is number => v !== null);
-  const industryMedianReturn = median(returns);
+  const { profile, peers } = dossier;
+  const stockReturn = ownReturn(dossier);
+  const returns = peers.peers.map((p) => p.oneYearReturn);
+  const peerMedianReturn = median(returns.map((r) => (r === null ? null : r + 1)));
+  const medianReturn = peerMedianReturn === null ? null : peerMedianReturn - 1;
 
   return {
     sector: profile.sector,
-    industry: profile.industry,
     stockReturn,
-    industryMedianReturn,
-    spread:
-      stockReturn !== null && industryMedianReturn !== null ? stockReturn - industryMedianReturn : null,
+    peerMedianReturn: medianReturn,
+    spread: stockReturn !== null && medianReturn !== null ? stockReturn - medianReturn : null,
     constituents: [
       { symbol: profile.symbol, name: profile.name, oneYearReturn: stockReturn },
-      ...peers.map((p) => ({ symbol: p.symbol, name: p.name, oneYearReturn: p.oneYearReturn }))
+      ...peers.peers.map((p) => ({ symbol: p.symbol, name: p.name, oneYearReturn: p.oneYearReturn }))
     ].sort((a, b) => (b.oneYearReturn ?? -Infinity) - (a.oneYearReturn ?? -Infinity))
   };
 }
@@ -71,63 +63,55 @@ export function industryPerformance(dossier: CompanyDossier): IndustryPerformanc
 export interface AlternativeScore {
   symbol: string;
   name: string;
-  industry: string;
   score: number;
-  /** Sub-scores, so the ranking can be argued with rather than trusted. */
   parts: { growth: number | null; profitability: number | null; valuation: number | null };
   metrics: Pick<PeerCompany, 'revenueGrowthYoY' | 'operatingMargin' | 'returnOnEquity' | 'trailingPE' | 'evToEbitda' | 'oneYearReturn'>;
-  /** One sentence naming the reason this name ranked where it did. */
   rationale: string;
 }
 
-function scoreEntry(
-  entry: UniverseEntry,
+export function scorePeer(
+  entry: PeerCompany,
   medians: { trailingPE: number | null; evToEbitda: number | null }
 ): AlternativeScore {
-  const growthParts = [
-    entry.revenueGrowthYoY !== null ? scale(entry.revenueGrowthYoY, -0.05, 0.25) : null
-  ].filter((v): v is number => v !== null);
+  const avg = (parts: Array<number | null>) => {
+    const valid = parts.filter((v): v is number => v !== null);
+    return valid.length ? valid.reduce((a, b) => a + b, 0) / valid.length : null;
+  };
 
-  const profitParts = [
+  const growth = avg([entry.revenueGrowthYoY !== null ? scale(entry.revenueGrowthYoY, -0.05, 0.25) : null]);
+  const profitability = avg([
     entry.operatingMargin !== null ? scale(entry.operatingMargin, 0, 0.3) : null,
     entry.returnOnEquity !== null ? scale(entry.returnOnEquity, 0, 0.3) : null
-  ].filter((v): v is number => v !== null);
+  ]);
 
-  // Loss-making or unpriceable names score 0 on valuation rather than being
-  // excluded — "no P/E because there are no earnings" is information, not a gap.
-  const valuationParts: number[] = [];
-  if (medians.trailingPE && entry.trailingPE) {
-    valuationParts.push(scale(entry.trailingPE / medians.trailingPE, 1.6, 0.6));
-  } else if (entry.trailingPE === null || Number.isNaN(entry.trailingPE)) {
-    valuationParts.push(0);
+  // A company with no P/E has no earnings; that scores 0 rather than being
+  // skipped, because it is information, not a gap.
+  const valuationParts: Array<number | null> = [];
+  if (medians.trailingPE) {
+    valuationParts.push(entry.trailingPE && entry.trailingPE > 0 ? scale(entry.trailingPE / medians.trailingPE, 1.6, 0.6) : 0);
   }
-  if (medians.evToEbitda && entry.evToEbitda) {
+  if (medians.evToEbitda && entry.evToEbitda && entry.evToEbitda > 0) {
     valuationParts.push(scale(entry.evToEbitda / medians.evToEbitda, 1.6, 0.6));
   }
-
-  const avg = (parts: number[]) => (parts.length ? parts.reduce((a, b) => a + b, 0) / parts.length : null);
-  const growth = avg(growthParts);
-  const profitability = avg(profitParts);
   const valuation = avg(valuationParts);
 
-  // Same relative emphasis as the main model, renormalized over what exists.
   const weighted: Array<[number | null, number]> = [
     [growth, 0.35],
     [profitability, 0.35],
     [valuation, 0.3]
   ];
-  const available = weighted.filter(([value]) => value !== null);
-  const weightSum = available.reduce((sum, [, w]) => sum + w, 0);
-  const score = weightSum
-    ? Math.round(available.reduce((sum, [value, w]) => sum + (value as number) * w, 0) / weightSum)
-    : 0;
+  const available = weighted.filter(([v]) => v !== null);
+  const weightSum = available.reduce((s, [, w]) => s + w, 0);
+  const score = weightSum ? Math.round(available.reduce((s, [v, w]) => s + (v as number) * w, 0) / weightSum) : 0;
 
-  const ranked = [
-    ['growth', growth],
-    ['profitability', profitability],
-    ['valuation', valuation]
-  ]
-    .filter((entryPair): entryPair is [string, number] => entryPair[1] !== null)
+  const ranked = (
+    [
+      ['growth', growth],
+      ['profitability', profitability],
+      ['valuation', valuation]
+    ] as Array<[string, number | null]>
+  )
+    .filter((pair): pair is [string, number] => pair[1] !== null)
     .sort((a, b) => b[1] - a[1]);
 
   const best = ranked[0];
@@ -142,7 +126,6 @@ function scoreEntry(
   return {
     symbol: entry.symbol,
     name: entry.name,
-    industry: entry.industry,
     score,
     parts: {
       growth: growth === null ? null : Math.round(growth),
@@ -162,16 +145,10 @@ function scoreEntry(
 }
 
 export function topAlternatives(dossier: CompanyDossier, count = 3): AlternativeScore[] {
-  const candidates = universeFor(dossier.profile.sector, dossier.profile.symbol);
-  if (!candidates.length) return [];
-
-  const medians = {
-    trailingPE: dossier.peers.sectorMedian.trailingPE ?? median(candidates.map((c) => c.trailingPE).filter(Boolean) as number[]),
-    evToEbitda: dossier.peers.sectorMedian.evToEbitda ?? median(candidates.map((c) => c.evToEbitda).filter(Boolean) as number[])
-  };
-
-  return candidates
-    .map((entry) => scoreEntry(entry, medians))
+  const { peers, peerMedian } = dossier.peers;
+  if (!peers.length) return [];
+  return peers
+    .map((entry) => scorePeer(entry, peerMedian))
     .sort((a, b) => b.score - a.score)
     .slice(0, count);
 }

@@ -21,7 +21,7 @@ export function Valuation({ dossier }: { dossier: CompanyDossier }) {
       label: 'Trailing P/E',
       hint: 'Share price divided by the last twelve months of earnings.',
       value: ratios.trailingPE,
-      median: peers.sectorMedian.trailingPE,
+      median: peers.peerMedian.trailingPE,
       format: formatMultiple,
       lowerIsBetter: true,
       unavailableReason: 'Not meaningful when trailing earnings are negative.'
@@ -46,7 +46,7 @@ export function Valuation({ dossier }: { dossier: CompanyDossier }) {
       label: 'EV / EBITDA',
       hint: 'Enterprise value against operating earnings before depreciation. Neutral to how the company is financed.',
       value: ratios.evToEbitda,
-      median: peers.sectorMedian.evToEbitda,
+      median: peers.peerMedian.evToEbitda,
       format: formatMultiple,
       lowerIsBetter: true,
       unavailableReason: 'Not meaningful when EBITDA is negative.'
@@ -82,7 +82,7 @@ export function Valuation({ dossier }: { dossier: CompanyDossier }) {
     <Section
       id="valuation"
       title="Valuation"
-      subtitle={`Compared with the ${peers.sector ?? 'sector'} median where one is available. Colour marks cheaper or dearer than peers — not good or bad.`}
+      subtitle={`Compared with the median of ${peers.peers.length} Finnhub peers, computed from their own figures. Colour marks cheaper or dearer than peers — not good or bad.`}
     >
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">
@@ -91,7 +91,7 @@ export function Valuation({ dossier }: { dossier: CompanyDossier }) {
               <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs tracking-wide text-slate-500 uppercase">
                 <th scope="col" className="px-4 py-2.5 font-medium">Metric</th>
                 <th scope="col" className="px-4 py-2.5 text-right font-medium">{dossier.profile.symbol}</th>
-                <th scope="col" className="px-4 py-2.5 text-right font-medium">Sector median</th>
+                <th scope="col" className="px-4 py-2.5 text-right font-medium">Peer median</th>
                 <th scope="col" className="px-4 py-2.5 text-right font-medium">vs median</th>
               </tr>
             </thead>

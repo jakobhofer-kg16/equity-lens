@@ -39,7 +39,7 @@ export const PROVIDERS: ProviderDescriptor[] = [
     envName: 'FINNHUB_API_KEY',
     signupUrl: 'https://finnhub.io/register',
     powers:
-      'The main key. Profile and logo, 133 ratios with several years of history, a real peer set, and the analyst rating distribution month by month. 60 requests per minute on the free plan.',
+      'Required. Profile and logo, 133 ratios with several years of history, a real peer set with metrics, company news, the earnings calendar, and the analyst rating distribution month by month. 60 requests per minute on the free plan.',
     required: true
   },
   {
@@ -65,7 +65,7 @@ export const PROVIDERS: ProviderDescriptor[] = [
     label: 'newsdata.io',
     envName: 'NEWS_DATA_IO_API_KEY',
     signupUrl: 'https://newsdata.io/',
-    powers: 'Live headlines in the news section. Without it the section shows sample or Alpha Vantage coverage.',
+    powers: 'Alternative headline source. Finnhub already supplies company news, so this is only worth adding for broader coverage.',
     required: false
   },
   {
