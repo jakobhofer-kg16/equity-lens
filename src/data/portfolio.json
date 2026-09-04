@@ -1,0 +1,886 @@
+{
+ "generatedAt": "2026-09-04T12:52:52.765Z",
+ "pricesAsOf": "2026-09-03",
+ "lookbackTradingDays": 504,
+ "riskFreeRate": 0.04,
+ "maxWeight": 0.1,
+ "minWeight": 0.02,
+ "maxPerIndustry": 4,
+ "thesis": "Cheap against industry peers on P/E and EV/EBITDA, with a latest earnings call that reads at least neutral and is not deteriorating, entered only on a golden cross above the 200-day average and below RSI 70.",
+ "universe": 383,
+ "withFundamentals": 372,
+ "passedScreen": 171,
+ "candidatesPriced": 40,
+ "passedTechnical": 16,
+ "rejectedByScreen": {
+  "not cheaper than peers": 128,
+  "tone deteriorating": 29,
+  "no positive earnings / EBITDA": 40,
+  "elevated hedging": 2,
+  "no transcript tone": 1,
+  "call tone below neutral band": 1
+ },
+ "rejectedByTechnical": [
+  "CTSH",
+  "NXPI",
+  "VICI",
+  "GDDY",
+  "UDR",
+  "PTC",
+  "TSN",
+  "TXT",
+  "LVS",
+  "FSLR",
+  "EQT",
+  "BR",
+  "LDOS",
+  "POOL",
+  "FIS",
+  "PNR",
+  "NOC",
+  "STZ",
+  "AMTM",
+  "CCL",
+  "EIX",
+  "CHTR",
+  "PCG",
+  "DOV"
+ ],
+ "universeMedians": {
+  "pe": 23.0026,
+  "evEbitda": 15.7493
+ },
+ "weights": {
+  "maxSharpe": {
+   "GEN": 0.0492,
+   "ALL": 0.1,
+   "INCY": 0.1,
+   "DAL": 0.1,
+   "NVDA": 0.1,
+   "CI": 0.02,
+   "FRT": 0.02,
+   "AES": 0.02,
+   "SPG": 0.1,
+   "BBY": 0.02,
+   "SOLV": 0.1,
+   "EMN": 0.02,
+   "DVA": 0.1,
+   "DVN": 0.02,
+   "EXPE": 0.1,
+   "OXY": 0.0308
+  },
+  "minVariance": {
+   "GEN": 0.0869,
+   "ALL": 0.1,
+   "INCY": 0.1,
+   "DAL": 0.02,
+   "NVDA": 0.0796,
+   "CI": 0.1,
+   "FRT": 0.1,
+   "AES": 0.0394,
+   "SPG": 0.1,
+   "BBY": 0.02,
+   "SOLV": 0.02,
+   "EMN": 0.02,
+   "DVA": 0.0741,
+   "DVN": 0.02,
+   "EXPE": 0.02,
+   "OXY": 0.1
+  },
+  "equal": {
+   "GEN": 0.0625,
+   "ALL": 0.0625,
+   "INCY": 0.0625,
+   "DAL": 0.0625,
+   "NVDA": 0.0625,
+   "CI": 0.0625,
+   "FRT": 0.0625,
+   "AES": 0.0625,
+   "SPG": 0.0625,
+   "BBY": 0.0625,
+   "SOLV": 0.0625,
+   "EMN": 0.0625,
+   "DVA": 0.0625,
+   "DVN": 0.0625,
+   "EXPE": 0.0625,
+   "OXY": 0.0625
+  }
+ },
+ "stats": {
+  "maxSharpe": {
+   "expectedReturn": 0.1907167368582663,
+   "volatility": 0.18972415237620596,
+   "sharpe": 0.7943993159047485
+  },
+  "minVariance": {
+   "expectedReturn": 0.10549401666445689,
+   "volatility": 0.15963145016501804,
+   "sharpe": 0.4102826642040328
+  },
+  "equal": {
+   "expectedReturn": 0.10379100295702003,
+   "volatility": 0.1807078755537525,
+   "sharpe": 0.353006213821849
+  },
+  "benchmark": {
+   "expectedReturn": 0.15832023949355198,
+   "volatility": 0.16508905966685486,
+   "sharpe": 0.7167055147828628
+  }
+ },
+ "holdings": [
+  {
+   "symbol": "GEN",
+   "name": "Gen Digital Inc",
+   "industry": "Technology",
+   "marketCap": 18753731608.50147,
+   "composite": 0.852,
+   "valuation": {
+    "pe": 17.6535,
+    "peerPe": 27.69155,
+    "evEbitda": 11.3081,
+    "peerEv": 22.4939,
+    "discountPe": 0.5686152887529383,
+    "discountEv": 0.9891847436793095
+   },
+   "quality": {
+    "operatingMargin": 0.4131,
+    "roe": 0.4189,
+    "debtToEquity": 3.139,
+    "revenueGrowth": 0.2016,
+    "dividendYield": 0.0235073
+   },
+   "tone": {
+    "latestDate": "2026-05-07",
+    "polarity": 0.934640522875817,
+    "priorPolarity": 0.8761904761904762,
+    "delta": 0.05845004668534082,
+    "hedging": 0.005341102209274096,
+    "managementPolarity": 0.9354838709677419,
+    "analystPolarity": 0.9259259259259259
+   },
+   "technical": {
+    "close": 31.33,
+    "asOf": "2026-09-03",
+    "sma50": 27.58780001999998,
+    "sma200": 24.583450000000056,
+    "goldenCross": true,
+    "rsi": 67.39865164495214,
+    "macdHist": 0.13860753227800648
+   },
+   "annualisedReturn": 0.08522740293495973,
+   "annualisedVol": 0.316268387546526,
+   "reasons": [
+    "P/E 17.7 vs peer 27.7 (57% cheaper)",
+    "EV/EBITDA 11.3 vs peer 22.5",
+    "call tone 0.93 (+0.06 vs prior)"
+   ]
+  },
+  {
+   "symbol": "ALL",
+   "name": "Allstate Corp",
+   "industry": "Insurance",
+   "marketCap": 66529455846.41113,
+   "composite": 0.755,
+   "valuation": {
+    "pe": 5.0304,
+    "peerPe": 13.1161,
+    "evEbitda": 4.2802,
+    "peerEv": 10.2997,
+    "discountPe": 1.6073672073791347,
+    "discountEv": 1.4063595159104714
+   },
+   "quality": {
+    "operatingMargin": 0.2422,
+    "roe": 0.4312,
+    "debtToEquity": 0.2447,
+    "revenueGrowth": 0.0592,
+    "dividendYield": 0.026059600000000002
+   },
+   "tone": {
+    "latestDate": "2026-04-29",
+    "polarity": 0.7142857142857143,
+    "priorPolarity": 0.608,
+    "delta": 0.10628571428571432,
+    "hedging": 0.0066635492167407065,
+    "managementPolarity": 0.7198067632850241,
+    "analystPolarity": 0.6666666666666666
+   },
+   "technical": {
+    "close": 263.10999,
+    "asOf": "2026-09-03",
+    "sma50": 256.14939993999985,
+    "sma200": 221.49405010750036,
+    "goldenCross": true,
+    "rsi": 55.16605906543737,
+    "macdHist": -0.38129883357423533
+   },
+   "annualisedReturn": 0.167135085224086,
+   "annualisedVol": 0.25536362152208175,
+   "reasons": [
+    "P/E 5.0 vs peer 13.1 (161% cheaper)",
+    "EV/EBITDA 4.3 vs peer 10.3",
+    "call tone 0.71 (+0.11 vs prior)"
+   ]
+  },
+  {
+   "symbol": "INCY",
+   "name": "Incyte Corp",
+   "industry": "Biotechnology",
+   "marketCap": 25945312868.86594,
+   "composite": 0.744,
+   "valuation": {
+    "pe": 16.0951,
+    "peerPe": 20.2649,
+    "evEbitda": 12.1833,
+    "peerEv": 22.04665,
+    "discountPe": 0.2590726370137497,
+    "discountEv": 0.8095795063734785
+   },
+   "quality": {
+    "operatingMargin": 0.3056,
+    "roe": 0.296,
+    "debtToEquity": 0.0067,
+    "revenueGrowth": 0.2693,
+    "dividendYield": null
+   },
+   "tone": {
+    "latestDate": "2026-04-28",
+    "polarity": 0.872093023255814,
+    "priorPolarity": 0.8523489932885906,
+    "delta": 0.019744029967223353,
+    "hedging": 0.010076775431861805,
+    "managementPolarity": 0.869281045751634,
+    "analystPolarity": 0.8947368421052632
+   },
+   "technical": {
+    "close": 128,
+    "asOf": "2026-09-03",
+    "sma50": 120.42259978000006,
+    "sma200": 104.6073498750001,
+    "goldenCross": true,
+    "rsi": 59.350772471184726,
+    "macdHist": -0.22255369250312373
+   },
+   "annualisedReturn": 0.33187004442749546,
+   "annualisedVol": 0.34662263858659015,
+   "reasons": [
+    "P/E 16.1 vs peer 20.3 (26% cheaper)",
+    "EV/EBITDA 12.2 vs peer 22.0",
+    "call tone 0.87 (+0.02 vs prior)"
+   ]
+  },
+  {
+   "symbol": "DAL",
+   "name": "Delta Air Lines Inc",
+   "industry": "Airlines",
+   "marketCap": 51787809730.22779,
+   "composite": 0.743,
+   "valuation": {
+    "pe": 13.0501,
+    "peerPe": 23.0026,
+    "evEbitda": 7.5776,
+    "peerEv": 15.7493,
+    "discountPe": 0.7626378341928415,
+    "discountEv": 1.0784021326013513
+   },
+   "quality": {
+    "operatingMargin": 0.0806,
+    "roe": 0.19329999999999997,
+    "debtToEquity": 0.68,
+    "revenueGrowth": 0.10279999999999999,
+    "dividendYield": 0.011080300000000001
+   },
+   "tone": {
+    "latestDate": "2026-07-09",
+    "polarity": 0.8,
+    "priorPolarity": 0.759656652360515,
+    "delta": 0.040343347639484994,
+    "hedging": 0.005785721665461308,
+    "managementPolarity": 0.8201438848920863,
+    "analystPolarity": 0.6923076923076923
+   },
+   "technical": {
+    "close": 78.75,
+    "asOf": "2026-09-03",
+    "sma50": 86.81239992000006,
+    "sma200": 74.07254995150002,
+    "goldenCross": true,
+    "rsi": 37.24739291703244,
+    "macdHist": -0.7732496154204243
+   },
+   "annualisedReturn": 0.31957005573735786,
+   "annualisedVol": 0.44350625927051973,
+   "reasons": [
+    "P/E 13.1 vs peer 23.0 (76% cheaper)",
+    "EV/EBITDA 7.6 vs peer 15.7",
+    "call tone 0.80 (+0.04 vs prior)"
+   ]
+  },
+  {
+   "symbol": "NVDA",
+   "name": "NVIDIA Corp",
+   "industry": "Semiconductors",
+   "marketCap": 5505645089845.869,
+   "composite": 0.74,
+   "valuation": {
+    "pe": 28.0398,
+    "peerPe": 36.1061,
+    "evEbitda": 26.9418,
+    "peerEv": 34.2776,
+    "discountPe": 0.2876732359003986,
+    "discountEv": 0.27228321789932375
+   },
+   "quality": {
+    "operatingMargin": 0.6517000000000001,
+    "roe": 1.1011,
+    "debtToEquity": 0.0538,
+    "revenueGrowth": 0.8338,
+    "dividendYield": 0.0003349
+   },
+   "tone": {
+    "latestDate": "2026-05-20",
+    "polarity": 0.8956521739130435,
+    "priorPolarity": 0.8089171974522293,
+    "delta": 0.08673497646081418,
+    "hedging": 0.007488559145749549,
+    "managementPolarity": 0.898989898989899,
+    "analystPolarity": 0.875
+   },
+   "technical": {
+    "close": 228.45,
+    "asOf": "2026-09-03",
+    "sma50": 209.87399959000007,
+    "sma200": 196.4606500525,
+    "goldenCross": true,
+    "rsi": 59.20979532745377,
+    "macdHist": 0.4697743294923633
+   },
+   "annualisedReturn": 0.3320566850869787,
+   "annualisedVol": 0.4518532714258359,
+   "reasons": [
+    "P/E 28.0 vs peer 36.1 (29% cheaper)",
+    "EV/EBITDA 26.9 vs peer 34.3",
+    "call tone 0.90 (+0.09 vs prior)"
+   ]
+  },
+  {
+   "symbol": "CI",
+   "name": "Cigna Group",
+   "industry": "Health Care",
+   "marketCap": 75641487136.18944,
+   "composite": 0.731,
+   "valuation": {
+    "pe": 11.6431,
+    "peerPe": 26.1044,
+    "evEbitda": 8.6272,
+    "peerEv": 16.9169,
+    "discountPe": 1.24204893885649,
+    "discountEv": 0.9608795437685458
+   },
+   "quality": {
+    "operatingMargin": 0.0352,
+    "roe": 0.1524,
+    "debtToEquity": 0.7543,
+    "revenueGrowth": 0.07769999999999999,
+    "dividendYield": 0.0174122
+   },
+   "tone": {
+    "latestDate": "2026-04-30",
+    "polarity": 0.8210862619808307,
+    "priorPolarity": 0.8339622641509434,
+    "delta": -0.012876002170112755,
+    "hedging": 0.004900959771288544,
+    "managementPolarity": 0.8257839721254355,
+    "analystPolarity": 0.7692307692307693
+   },
+   "technical": {
+    "close": 286.26001,
+    "asOf": "2026-09-03",
+    "sma50": 283.44100006000025,
+    "sma200": 279.5205497900001,
+    "goldenCross": true,
+    "rsi": 55.85694380440101,
+    "macdHist": 1.1177864923314862
+   },
+   "annualisedReturn": -0.1160718101399595,
+   "annualisedVol": 0.31642992172201345,
+   "reasons": [
+    "P/E 11.6 vs peer 26.1 (124% cheaper)",
+    "EV/EBITDA 8.6 vs peer 16.9",
+    "call tone 0.82 (-0.01 vs prior)"
+   ]
+  },
+  {
+   "symbol": "FRT",
+   "name": "Federal Realty Investment Trust",
+   "industry": "Real Estate",
+   "marketCap": 10241604602.227234,
+   "composite": 0.723,
+   "valuation": {
+    "pe": 23.4795,
+    "peerPe": 36.061049999999994,
+    "evEbitda": 14.4743,
+    "peerEv": 19.4117,
+    "discountPe": 0.5358525522264099,
+    "discountEv": 0.3411149416552095
+   },
+   "quality": {
+    "operatingMargin": 0.47859999999999997,
+    "roe": 0.1328,
+    "debtToEquity": 1.5255,
+    "revenueGrowth": 0.08039999999999999,
+    "dividendYield": 0.04733469999999999
+   },
+   "tone": {
+    "latestDate": "2026-02-12",
+    "polarity": 0.869281045751634,
+    "priorPolarity": 0.8426966292134831,
+    "delta": 0.026584416538150912,
+    "hedging": 0.006568407561678949,
+    "managementPolarity": 0.8548387096774194,
+    "analystPolarity": 0.9310344827586207
+   },
+   "technical": {
+    "close": 117.16,
+    "asOf": "2026-09-03",
+    "sma50": 121.04579981999996,
+    "sma200": 111.06759989499999,
+    "goldenCross": true,
+    "rsi": 42.04782801538484,
+    "macdHist": 0.16442008129063201
+   },
+   "annualisedReturn": 0.01157019335566865,
+   "annualisedVol": 0.20514150825063798,
+   "reasons": [
+    "P/E 23.5 vs peer 36.1 (54% cheaper)",
+    "EV/EBITDA 14.5 vs peer 19.4",
+    "call tone 0.87 (+0.03 vs prior)"
+   ]
+  },
+  {
+   "symbol": "AES",
+   "name": "AES Corp",
+   "industry": "Utilities",
+   "marketCap": 10544622623.843243,
+   "composite": 0.719,
+   "valuation": {
+    "pe": 5.6401,
+    "peerPe": 21.030549999999998,
+    "evEbitda": 11.2915,
+    "peerEv": 13.30475,
+    "discountPe": 2.728754809311891,
+    "discountEv": 0.1782978346543862
+   },
+   "quality": {
+    "operatingMargin": 0.1522,
+    "roe": 0.43309999999999993,
+    "debtToEquity": 7.3584,
+    "revenueGrowth": 0.0849,
+    "dividendYield": 0.0391967
+   },
+   "tone": {
+    "latestDate": "2025-11-04",
+    "polarity": 0.7964071856287425,
+    "priorPolarity": 0.8009950248756219,
+    "delta": -0.004587839246879444,
+    "hedging": 0.005629945222154595,
+    "managementPolarity": 0.7910447761194029,
+    "analystPolarity": 0.8181818181818182
+   },
+   "technical": {
+    "close": 14.78,
+    "asOf": "2026-09-03",
+    "sma50": 14.738400000000007,
+    "sma200": 14.587499989999992,
+    "goldenCross": true,
+    "rsi": 55.3810963062155,
+    "macdHist": 0.004815795526231176
+   },
+   "annualisedReturn": -0.0775583850676137,
+   "annualisedVol": 0.42155064168477896,
+   "reasons": [
+    "P/E 5.6 vs peer 21.0 (273% cheaper)",
+    "EV/EBITDA 11.3 vs peer 13.3",
+    "call tone 0.80 (-0.00 vs prior)"
+   ]
+  },
+  {
+   "symbol": "SPG",
+   "name": "Simon Property Group Inc",
+   "industry": "Real Estate",
+   "marketCap": 68437615177.84359,
+   "composite": 0.712,
+   "valuation": {
+    "pe": 14.7936,
+    "peerPe": 36.061049999999994,
+    "evEbitda": 19.4117,
+    "peerEv": 19.4117,
+    "discountPe": 1.4376115347177154,
+    "discountEv": 0
+   },
+   "quality": {
+    "operatingMargin": 0.47100000000000003,
+    "roe": 1.0968,
+    "debtToEquity": 5.4587,
+    "revenueGrowth": 0.1502,
+    "dividendYield": 0.06289310000000001
+   },
+   "tone": {
+    "latestDate": "2026-05-11",
+    "polarity": 0.8054054054054054,
+    "priorPolarity": 0.7794117647058824,
+    "delta": 0.025993640699523035,
+    "hedging": 0.009301748728761007,
+    "managementPolarity": 0.7961783439490446,
+    "analystPolarity": 0.8571428571428571
+   },
+   "technical": {
+    "close": 211.52,
+    "asOf": "2026-09-03",
+    "sma50": 222.8897997699999,
+    "sma200": 201.64995069,
+    "goldenCross": true,
+    "rsi": 34.85047232652349,
+    "macdHist": -0.9577436385382594
+   },
+   "annualisedReturn": 0.12267418092310266,
+   "annualisedVol": 0.2287703097469082,
+   "reasons": [
+    "P/E 14.8 vs peer 36.1 (144% cheaper)",
+    "EV/EBITDA 19.4 vs peer 19.4",
+    "call tone 0.81 (+0.03 vs prior)"
+   ]
+  },
+  {
+   "symbol": "BBY",
+   "name": "Best Buy Co Inc",
+   "industry": "Retail",
+   "marketCap": 18440015359.974598,
+   "composite": 0.712,
+   "valuation": {
+    "pe": 14.5839,
+    "peerPe": 20.3302,
+    "evEbitda": 9.1438,
+    "peerEv": 13.3911,
+    "discountPe": 0.3940166896372028,
+    "discountEv": 0.46450053588223694
+   },
+   "quality": {
+    "operatingMargin": 0.0405,
+    "roe": 0.4282,
+    "debtToEquity": 0.3968,
+    "revenueGrowth": 0.014499999999999999,
+    "dividendYield": 0.052942
+   },
+   "tone": {
+    "latestDate": "2026-05-28",
+    "polarity": 0.7725752508361204,
+    "priorPolarity": 0.5984251968503937,
+    "delta": 0.1741500539857267,
+    "hedging": 0.009367194004995838,
+    "managementPolarity": 0.776,
+    "analystPolarity": 0.7551020408163265
+   },
+   "technical": {
+    "close": 87.49,
+    "asOf": "2026-09-03",
+    "sma50": 83.75459993999986,
+    "sma200": 71.39054998499994,
+    "goldenCross": true,
+    "rsi": 55.83318260172729,
+    "macdHist": -0.13179070980326169
+   },
+   "annualisedReturn": -0.067722033405648,
+   "annualisedVol": 0.40071368003996605,
+   "reasons": [
+    "P/E 14.6 vs peer 20.3 (39% cheaper)",
+    "EV/EBITDA 9.1 vs peer 13.4",
+    "call tone 0.77 (+0.17 vs prior)"
+   ]
+  },
+  {
+   "symbol": "SOLV",
+   "name": "Solventum Corp",
+   "industry": "Health Care",
+   "marketCap": 15735482751.922089,
+   "composite": 0.701,
+   "valuation": {
+    "pe": 10.2561,
+    "peerPe": 26.1044,
+    "evEbitda": 7.8749,
+    "peerEv": 16.9169,
+    "discountPe": 1.545255993993818,
+    "discountEv": 1.1482050565721464
+   },
+   "quality": {
+    "operatingMargin": 0.2386,
+    "roe": 0.2898,
+    "debtToEquity": 0.9972,
+    "revenueGrowth": -0.009300000000000001,
+    "dividendYield": null
+   },
+   "tone": {
+    "latestDate": "2026-05-05",
+    "polarity": 0.6654804270462633,
+    "priorPolarity": 0.6075949367088608,
+    "delta": 0.057885490337402534,
+    "hedging": 0.007252559726962458,
+    "managementPolarity": 0.6573705179282868,
+    "analystPolarity": 0.7333333333333333
+   },
+   "technical": {
+    "close": 92.44,
+    "asOf": "2026-09-03",
+    "sma50": 83.73819995999996,
+    "sma200": 77.31139995500006,
+    "goldenCross": true,
+    "rsi": 68.19770120998055,
+    "macdHist": -0.002336962940354681
+   },
+   "annualisedReturn": 0.19234785360805198,
+   "annualisedVol": 0.3024924819006989,
+   "reasons": [
+    "P/E 10.3 vs peer 26.1 (155% cheaper)",
+    "EV/EBITDA 7.9 vs peer 16.9",
+    "call tone 0.67 (+0.06 vs prior)"
+   ]
+  },
+  {
+   "symbol": "EMN",
+   "name": "Eastman Chemical Co",
+   "industry": "Chemicals",
+   "marketCap": 8094490319.193874,
+   "composite": 0.7,
+   "valuation": {
+    "pe": 18.4298,
+    "peerPe": 47.6278,
+    "evEbitda": 9.9466,
+    "peerEv": 18.7561,
+    "discountPe": 1.5842819781006847,
+    "discountEv": 0.885679528683168
+   },
+   "quality": {
+    "operatingMargin": 0.08470000000000001,
+    "roe": 0.0742,
+    "debtToEquity": 0.8031,
+    "revenueGrowth": -0.0453,
+    "dividendYield": 0.038588399999999995
+   },
+   "tone": {
+    "latestDate": "2026-04-30",
+    "polarity": 0.5647668393782384,
+    "priorPolarity": 0.2366412213740458,
+    "delta": 0.32812561800419254,
+    "hedging": 0.008516678495386799,
+    "managementPolarity": 0.5220125786163522,
+    "analystPolarity": 0.7647058823529411
+   },
+   "technical": {
+    "close": 70.77,
+    "asOf": "2026-09-03",
+    "sma50": 70.61779980000004,
+    "sma200": 70.52644995999995,
+    "goldenCross": true,
+    "rsi": 45.13886394548618,
+    "macdHist": -0.41840238089339155
+   },
+   "annualisedReturn": -0.17784266737678242,
+   "annualisedVol": 0.36405896330115906,
+   "reasons": [
+    "P/E 18.4 vs peer 47.6 (158% cheaper)",
+    "EV/EBITDA 9.9 vs peer 18.8",
+    "call tone 0.56 (+0.33 vs prior)"
+   ]
+  },
+  {
+   "symbol": "DVA",
+   "name": "DaVita Inc",
+   "industry": "Health Care",
+   "marketCap": 11589907821.772898,
+   "composite": 0.697,
+   "valuation": {
+    "pe": 13.7029,
+    "peerPe": 26.1044,
+    "evEbitda": 7.7002,
+    "peerEv": 16.9169,
+    "discountPe": 0.9050274029584977,
+    "discountEv": 1.1969429365471025
+   },
+   "quality": {
+    "operatingMargin": 0.1507,
+    "roe": 1.8122,
+    "debtToEquity": 77.9938,
+    "revenueGrowth": 0.0645,
+    "dividendYield": null
+   },
+   "tone": {
+    "latestDate": "2026-05-05",
+    "polarity": 0.5882352941176471,
+    "priorPolarity": 0.36363636363636365,
+    "delta": 0.22459893048128343,
+    "hedging": 0.007509974184463741,
+    "managementPolarity": 0.5142857142857142,
+    "analystPolarity": 0.75
+   },
+   "technical": {
+    "close": 181.66,
+    "asOf": "2026-09-03",
+    "sma50": 208.8716006,
+    "sma200": 163.74669970499997,
+    "goldenCross": true,
+    "rsi": 40.74332258891766,
+    "macdHist": 1.8421476419622493
+   },
+   "annualisedReturn": 0.08506571149225486,
+   "annualisedVol": 0.38744936605559466,
+   "reasons": [
+    "P/E 13.7 vs peer 26.1 (91% cheaper)",
+    "EV/EBITDA 7.7 vs peer 16.9",
+    "call tone 0.59 (+0.22 vs prior)"
+   ]
+  },
+  {
+   "symbol": "DVN",
+   "name": "Devon Energy Corp",
+   "industry": "Energy",
+   "marketCap": 53668998663.57393,
+   "composite": 0.68,
+   "valuation": {
+    "pe": 16.3793,
+    "peerPe": 16.5141,
+    "evEbitda": 7.4967,
+    "peerEv": 10.738150000000001,
+    "discountPe": 0.00822989993467349,
+    "discountEv": 0.4323835821094617
+   },
+   "quality": {
+    "operatingMargin": 0.2274,
+    "roe": 0.149,
+    "debtToEquity": 0.5417,
+    "revenueGrowth": 0.1464,
+    "dividendYield": 0.09305400000000001
+   },
+   "tone": {
+    "latestDate": "2026-05-05",
+    "polarity": 0.8790322580645161,
+    "priorPolarity": 0.8109452736318408,
+    "delta": 0.06808698443267536,
+    "hedging": 0.007957844929562318,
+    "managementPolarity": 0.9047619047619048,
+    "analystPolarity": 0.7368421052631579
+   },
+   "technical": {
+    "close": 48.79,
+    "asOf": "2026-09-03",
+    "sma50": 44.704599860000044,
+    "sma200": 43.445449990000014,
+    "goldenCross": true,
+    "rsi": 62.197359197023324,
+    "macdHist": 0.07519474606970622
+   },
+   "annualisedReturn": 0.040431442028713044,
+   "annualisedVol": 0.3806277060427155,
+   "reasons": [
+    "P/E 16.4 vs peer 16.5 (1% cheaper)",
+    "EV/EBITDA 7.5 vs peer 10.7",
+    "call tone 0.88 (+0.07 vs prior)"
+   ]
+  },
+  {
+   "symbol": "EXPE",
+   "name": "Expedia Group Inc",
+   "industry": "Hotels, Restaurants & Leisure",
+   "marketCap": 36382525345.92177,
+   "composite": 0.671,
+   "valuation": {
+    "pe": 18.027,
+    "peerPe": 19.933500000000002,
+    "evEbitda": 10.4016,
+    "peerEv": 13.456,
+    "discountPe": 0.10575802962223335,
+    "discountEv": 0.29364713121058283
+   },
+   "quality": {
+    "operatingMargin": 0.15990000000000001,
+    "roe": 1.8484,
+    "debtToEquity": 4.7983,
+    "revenueGrowth": 0.12,
+    "dividendYield": null
+   },
+   "tone": {
+    "latestDate": "2026-05-07",
+    "polarity": 0.9061371841155235,
+    "priorPolarity": 0.8634538152610441,
+    "delta": 0.04268336885447932,
+    "hedging": 0.007802340702210663,
+    "managementPolarity": 0.904,
+    "analystPolarity": 0.9259259259259259
+   },
+   "technical": {
+    "close": 303.14001,
+    "asOf": "2026-09-03",
+    "sma50": 293.7853999200002,
+    "sma200": 258.4241996150002,
+    "goldenCross": true,
+    "rsi": 45.84530334087137,
+    "macdHist": -5.049580972036937
+   },
+   "annualisedReturn": 0.38303669464227735,
+   "annualisedVol": 0.4526014479005467,
+   "reasons": [
+    "P/E 18.0 vs peer 19.9 (11% cheaper)",
+    "EV/EBITDA 10.4 vs peer 13.5",
+    "call tone 0.91 (+0.04 vs prior)"
+   ]
+  },
+  {
+   "symbol": "OXY",
+   "name": "Occidental Petroleum Corp",
+   "industry": "Energy",
+   "marketCap": 60588022064.708755,
+   "composite": 0.654,
+   "valuation": {
+    "pe": 8.4075,
+    "peerPe": 16.5141,
+    "evEbitda": 5.4356,
+    "peerEv": 10.738150000000001,
+    "discountPe": 0.9642105263157892,
+    "discountEv": 0.9755224814187948
+   },
+   "quality": {
+    "operatingMargin": 0.2614,
+    "roe": 0.18970000000000004,
+    "debtToEquity": 0.6215,
+    "revenueGrowth": 0.015300000000000001,
+    "dividendYield": 0.011968099999999999
+   },
+   "tone": {
+    "latestDate": "2026-05-05",
+    "polarity": 0.6610169491525424,
+    "priorPolarity": 0.6227544910179641,
+    "delta": 0.03826245813457829,
+    "hedging": 0.00729054619337875,
+    "managementPolarity": 0.6754716981132075,
+    "analystPolarity": 0.5333333333333333
+   },
+   "technical": {
+    "close": 60.61,
+    "asOf": "2026-09-03",
+    "sma50": 55.941799999999986,
+    "sma200": 52.31134998,
+    "goldenCross": true,
+    "rsi": 60.096250747163616,
+    "macdHist": -0.020846284122741032
+   },
+   "annualisedReturn": 0.028865593841377615,
+   "annualisedVol": 0.35320966151448296,
+   "reasons": [
+    "P/E 8.4 vs peer 16.5 (96% cheaper)",
+    "EV/EBITDA 5.4 vs peer 10.7",
+    "call tone 0.66 (+0.04 vs prior)"
+   ]
+  }
+ ],
+ "nextInLine": []
+}

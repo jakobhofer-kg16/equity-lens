@@ -32,6 +32,36 @@ npm run backtest:fetch    # pull the backtest inputs (needs FINNHUB_KEY, TWELVED
 npm run backtest:compute  # score the anchor date and write src/data/backtest.json
 ```
 
+## Portfolio dashboard (post-module assignment)
+
+`#/portfolio` — reachable from the **Portfolio** button in the header — is the
+post-module deliverable: a basket of S&P 500 names that are **cheaper than their
+industry peers, whose latest earnings call reads at least neutral and is not
+deteriorating, entered only on a golden cross with RSI below 70**. It fetches a
+live quote for every holding on load, shows the optimised weights (maximum
+Sharpe, minimum variance and equal weight, switchable), a trading-signal summary
+per holding, and an executive commentary written by the model from the live
+quotes and signals when an OpenRouter key is present.
+
+The selection and optimisation run offline and are committed:
+
+```bash
+npx tsx scripts/portfolio.ts tone                     # call tone for the universe (no key)
+TWELVEDATA_KEY=… npx tsx scripts/portfolio.ts build   # screen, prices, optimise → src/data/portfolio.json
+```
+
+The thesis is derived from the model backtest below: valuation against peers
+was the one category with signal, so the strategy keeps it and adds a text
+signal and a technical entry filter. The written deliverables — functional
+requirements document, portfolio construction, executive summary and the
+investment committee deck — are generated from the same data files:
+
+```bash
+python3 scripts/docs/build_docx.py     # docs/HOFER_POST.docx from the WU template
+python3 scripts/docs/print_pdf.py docs/HOFER_POST.docx
+node scripts/docs/build_pptx.cjs       # docs/HOFER_POST_Presentation.pptx
+```
+
 ## What is on the page
 
 | Section | What it answers | Source |
@@ -50,6 +80,7 @@ npm run backtest:compute  # score the anchor date and write src/data/backtest.js
 | Fun facts | Arithmetic curiosities from the loaded data | computed |
 | Investment thesis builder | Editable bull/base/bear; a model can write it from the whole dossier | template or OpenRouter |
 | Watchlist | Remembers the score when added and shows what moved since | browser |
+| Portfolio (`#/portfolio`) | Live quotes, optimised weights, signals and model commentary for the thesis basket | Finnhub, committed data |
 
 ## Data providers
 

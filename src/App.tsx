@@ -21,6 +21,7 @@ import { FunFacts } from './components/FunFacts';
 import { ThesisBuilder } from './components/ThesisBuilder';
 import { WatchlistPanel } from './components/Watchlist';
 import { ApiKeyPanel } from './components/ApiKeyPanel';
+import { PortfolioPage } from './components/PortfolioPage';
 import { Card, ErrorState, Skeleton } from './components/ui/primitives';
 
 const INITIAL_SYMBOL = 'AAPL';
@@ -63,6 +64,13 @@ export default function App() {
   const [error, setError] = useState<{ title: string; detail: string } | null>(null);
   const [watchlistOpen, setWatchlistOpen] = useState(false);
   const [keysOpen, setKeysOpen] = useState(false);
+  const [route, setRoute] = useState<'company' | 'portfolio'>(() => (location.hash.startsWith('#/portfolio') ? 'portfolio' : 'company'));
+
+  useEffect(() => {
+    const onHash = () => setRoute(location.hash.startsWith('#/portfolio') ? 'portfolio' : 'company');
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
   const [status, setStatus] = useState(providerStatus);
 
   const watchlist = useWatchlist();
@@ -85,7 +93,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (providerStatus().ready) void fetchSymbol(INITIAL_SYMBOL);
+    // On the portfolio route the dossier is not needed on load, and its ~24
+    // requests would collide with the sixteen live-quote calls on Finnhub's
+    // burst limit.
+    if (providerStatus().ready && !location.hash.startsWith('#/portfolio')) void fetchSymbol(INITIAL_SYMBOL);
     else setLoading(false);
   }, [fetchSymbol]);
 
@@ -141,6 +152,15 @@ export default function App() {
         busy={loading}
       />
 
+      {route === 'portfolio' ? (
+        <PortfolioPage
+          onOpenCompany={(next) => {
+            location.hash = '';
+            if (next) void fetchSymbol(next);
+          }}
+          onOpenKeys={() => setKeysOpen(true)}
+        />
+      ) : (
       <main className="mx-auto max-w-6xl space-y-8 px-4 py-6">
         {!status.ready ? (
           <Card className="p-6">
@@ -210,6 +230,7 @@ export default function App() {
           </>
         ) : null}
       </main>
+      )}
 
       <footer className="border-t border-slate-200 bg-white">
         <div className="mx-auto max-w-6xl space-y-2 px-4 py-6 text-xs leading-relaxed text-slate-500">

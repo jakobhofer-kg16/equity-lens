@@ -141,3 +141,78 @@ export async function writeThesisWithAi(
     invalidation: field('invalidation')
   };
 }
+
+// --- portfolio executive commentary --------------------------------------------
+
+export interface PortfolioCommentaryInput {
+  thesis: string;
+  method: string;
+  asOf: string;
+  stats: { expectedReturn: number; volatility: number; sharpe: number };
+  benchmark: { expectedReturn: number; volatility: number; sharpe: number };
+  holdings: Array<{
+    symbol: string;
+    name: string;
+    industry: string;
+    weight: number;
+    livePrice: number | null;
+    dayChangePct: number | null;
+    discountPe: number;
+    tone: number | null;
+    toneDelta: number | null;
+    goldenCross: boolean | null;
+    rsi: number | null;
+  }>;
+  portfolioDayChangePct: number | null;
+}
+
+export function buildPortfolioPrompt(input: PortfolioCommentaryInput): string {
+  const rows = input.holdings
+    .map(
+      (h) =>
+        `${h.symbol} (${h.industry}) w=${(h.weight * 100).toFixed(1)}% | price ${h.livePrice?.toFixed(2) ?? 'n/a'} day ${h.dayChangePct === null ? 'n/a' : (h.dayChangePct >= 0 ? '+' : '') + h.dayChangePct.toFixed(2) + '%'} | P/E ${(h.discountPe * 100).toFixed(0)}% below peers | call tone ${h.tone?.toFixed(2) ?? 'n/a'}${h.toneDelta === null ? '' : ` (${h.toneDelta >= 0 ? '+' : ''}${h.toneDelta.toFixed(2)})`} | ${h.goldenCross === null ? 'trend n/a' : h.goldenCross ? 'golden cross' : 'below 200d'} RSI ${h.rsi?.toFixed(0) ?? 'n/a'}`
+    )
+    .join('\n');
+
+  return `You are the portfolio manager writing the executive commentary for an investment committee that has allocated $1M USD to this strategy. Use ONLY the data below. Be direct, specific and quantitative. Never promise returns.
+
+# STRATEGY
+${input.thesis}
+Weighting: ${input.method}. Signals as of ${input.asOf}. Risk-free rate assumed 4%.
+
+# PORTFOLIO (in-sample, two years of daily data)
+Expected return ${pct(input.stats.expectedReturn)}, volatility ${pct(input.stats.volatility)}, Sharpe ${input.stats.sharpe.toFixed(2)}.
+Benchmark SPY over the same window: return ${pct(input.benchmark.expectedReturn)}, volatility ${pct(input.benchmark.volatility)}, Sharpe ${input.benchmark.sharpe.toFixed(2)}.
+Portfolio day change today: ${input.portfolioDayChangePct === null ? 'n/a' : (input.portfolioDayChangePct >= 0 ? '+' : '') + input.portfolioDayChangePct.toFixed(2) + '%'}.
+
+# HOLDINGS
+${rows}
+
+# TASK
+Write four short paragraphs, plain prose, no headings, no bullet points:
+1. What the portfolio is and what today's move says (name the two or three biggest movers).
+2. Where the thesis is currently strongest and weakest across the holdings (name names).
+3. The two risks the committee should worry about most, with the numbers that justify them.
+4. What would make you change the portfolio — the concrete trigger.
+Total about 220 words.`;
+}
+
+export async function writePortfolioCommentary(apiKey: string, input: PortfolioCommentaryInput): Promise<string> {
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: THESIS_MODEL,
+      messages: [{ role: 'user', content: buildPortfolioPrompt(input) }],
+      temperature: 0.3,
+      max_tokens: 900,
+      reasoning: { enabled: false }
+    })
+  });
+  const json = (await response.json()) as Record<string, unknown>;
+  const error = json.error as { code?: number; message?: string } | undefined;
+  if (error) throw new DataError(error.code === 401 ? 'no-api-key' : 'provider-error', `(HTTP ${error.code ?? response.status}) ${error.message ?? ''}`);
+  const content = (json.choices as Array<{ message?: { content?: string } }> | undefined)?.[0]?.message?.content;
+  if (!content) throw new DataError('provider-error', 'OpenRouter returned no commentary.');
+  return content.trim();
+}

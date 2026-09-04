@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { KeyRound, LineChart, Search, Star } from 'lucide-react';
+import { Briefcase, KeyRound, LineChart, Search, Star } from 'lucide-react';
 import { Pill } from './ui/primitives';
 
 const EXAMPLES = ['AAPL', 'MSFT', 'TSLA'];
@@ -64,6 +64,12 @@ export function Header({
         </form>
 
         <div className="flex items-center gap-3">
+          <a
+            href="#/portfolio"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+          >
+            <Briefcase className="h-4 w-4" aria-hidden /> Portfolio
+          </a>
           <button
             type="button"
             onClick={onToggleWatchlist}
