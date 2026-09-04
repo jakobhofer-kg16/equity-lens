@@ -151,6 +151,8 @@ export interface Verdict {
 }
 
 /** The headline sentence is chosen by the numbers, never pre-written. */
+const fmtRho = (rho: number) => (Math.abs(rho) < 0.005 ? '0.00' : rho.toFixed(2));
+
 export function verdict(rows: BacktestRow[]): Verdict {
   const rho = spearman(
     rows.map((r) => r.score),
@@ -161,10 +163,10 @@ export function verdict(rows: BacktestRow[]): Verdict {
 
   const sentence =
     reading === 'none'
-      ? `Across ${rows.length} companies the rank correlation between score and excess return is ${rho === null ? 'undefined' : rho.toFixed(2)}, inside the ±${floor.toFixed(2)} noise floor for this sample size. The score did not rank the following year's returns better than chance.`
+      ? `Across ${rows.length} companies the rank correlation between score and excess return is ${rho === null ? 'undefined' : fmtRho(rho)}, inside the ±${floor.toFixed(2)} noise floor for this sample size. The score did not rank the following year's returns better than chance.`
       : reading === 'positive'
-        ? `Across ${rows.length} companies the rank correlation between score and excess return is ${rho!.toFixed(2)}, above the ±${floor.toFixed(2)} noise floor. Higher scores were followed by higher excess returns — weakly, and in one year.`
-        : `Across ${rows.length} companies the rank correlation between score and excess return is ${rho!.toFixed(2)}, beyond the ±${floor.toFixed(2)} noise floor in the wrong direction. Higher scores were followed by lower excess returns in this year — the model's bands read momentum and quality that the market had already priced.`;
+        ? `Across ${rows.length} companies the rank correlation between score and excess return is ${fmtRho(rho!)}, above the ±${floor.toFixed(2)} noise floor. Higher scores were followed by higher excess returns — weakly, and in one year.`
+        : `Across ${rows.length} companies the rank correlation between score and excess return is ${fmtRho(rho!)}, beyond the ±${floor.toFixed(2)} noise floor in the wrong direction. Higher scores were followed by lower excess returns in this year — the model's bands read momentum and quality that the market had already priced.`;
 
   return { rho, floor, reading, sentence };
 }

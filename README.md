@@ -167,7 +167,18 @@ trading days, measured as excess over SPY.
 
 The result is committed as `src/data/backtest.json` and rendered in the Track
 record section. The headline sentence there is chosen by the numbers — a null
-or inverse result reads as exactly that. Growth is measured on per-share
+or inverse result reads as exactly that.
+
+**What it found (anchor 31 Jan 2025, 359 of 383 companies, SPY +14.6%):** the
+rank correlation between the total score and the following year's excess return
+is 0.00, inside the ±0.11 noise floor. The score did not rank returns better
+than chance. Two categories did move beyond the noise: **valuation vs peers
+(ρ +0.14)** — cheaper-than-peers was followed by better returns — and
+**profitability (ρ −0.13)** — high margins and returns on capital were followed
+by *worse* returns, consistent with quality having been priced in already.
+Growth, financial health and momentum carried no detectable signal. All three
+labels had a median excess return below zero, which mostly says the median
+stock lagged a cap-weighted index in a year led by the largest names. Growth is measured on per-share
 revenue, which buybacks flatter; interest coverage and PEG are not available
 historically and are absent.
 
